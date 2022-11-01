@@ -11,20 +11,42 @@ struct BoardState {
 
 impl BoardState {
     fn can_move(&self, board_move: BoardMove) -> bool {
+        fn get_positions_between(start: Position, end: Position) -> Vec<Position> {
+            let mut vec = Vec::new();
+            let mut current = start;
+            loop {
+                let step = (end - start).clamp(-1, 1);
+                current += step;
+                if current == end {
+                    break;
+                } else {
+                    vec.push(current);
+                }
+            }
+            vec
+        }
         match board_move {
             BoardMove::Normal { piece, target } => {
                 match piece.state {
                     PieceState::Moving { .. } => false,
                     PieceState::Stationary { cooldown, .. } if cooldown > 0 => false,
                     PieceState::Stationary { position, .. } => {
+                        if position == target {
+                            return false;
+                        }
+                        let target_piece = self.get_piece(target);
+
+                        if let Some(ref target_piece) = target_piece && target_piece.side == piece.side {
+                            return false
+                        }
                         match piece.kind {
                             PieceKind::Pawn => {
                                 let delta = target - position;
-                                let is_capturing = self
-                                    .get_piece(target)
+                                let is_capturing_enemy = target_piece
                                     .map_or(false, |target_piece| piece.side != target_piece.side);
-                                delta.y == forward_y(piece.side) && (delta.x == 0 && !is_capturing)
-                                    || (delta.x.abs() == 1 && is_capturing)
+                                delta.y == forward_y(piece.side)
+                                    && (delta.x == 0 && !is_capturing_enemy)
+                                    || (delta.x.abs() == 1 && is_capturing_enemy)
                             }
                             PieceKind::Knight => {
                                 let delta = target - position;
@@ -32,7 +54,30 @@ impl BoardState {
                                 let abs_y = delta.y.abs();
                                 (abs_x == 1 && abs_y == 2) || (abs_x == 2 && abs_y == 1)
                             }
-                            _ => false, // TODO: do other pieces
+                            PieceKind::Bishop | PieceKind::Rook | PieceKind::Queen => {
+                                // check that target is not occupied by friendly unit
+                                let target_has_friendly = target_piece
+                                    .map_or(false, |target_piece| target_piece.side == piece.side);
+                                // check if every square in its path is not occupied by unit
+                                let path_is_occupied = get_positions_between(position, target)
+                                    .iter()
+                                    .any(|&pos| self.is_occupied(pos));
+                                // check if the piece can go on this delta
+                                let delta = target - position;
+                                let is_straight = delta.x == 0 || delta.y == 0;
+                                let is_diagonal = delta.x.abs() == delta.y.abs();
+                                let allowed_delta = match piece.kind {
+                                    PieceKind::Bishop => is_diagonal,
+                                    PieceKind::Rook => is_straight,
+                                    PieceKind::Queen => is_straight || is_diagonal,
+                                    _ => false,
+                                };
+                                !target_has_friendly && !path_is_occupied && allowed_delta
+                            }
+                            PieceKind::King => {
+                                let delta = target - position;
+                                delta.x * delta.x + delta.y * delta.y <= 2
+                            }
                         }
                     }
                 }

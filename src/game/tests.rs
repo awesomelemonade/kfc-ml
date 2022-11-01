@@ -86,7 +86,13 @@ fn test_initial_white_pieces() {
             ],
         }"#
     );
-    expect!(&*INITIAL_BLACK_PIECES, r#"
+}
+
+#[test]
+fn test_initial_black_pieces() {
+    expect!(
+        &*INITIAL_BLACK_PIECES,
+        r#"
         {
             Pawn: [
                 Position {
@@ -164,5 +170,6 @@ fn test_initial_white_pieces() {
                     y: 0,
                 },
             ],
-        }"#);
+        }"#
+    );
 }
