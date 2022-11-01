@@ -9,160 +9,160 @@ fn test_initial_white_pieces() {
         r#"
         {
             Pawn: [
-                (
-                    0.0,
-                    6.0,
-                ),
-                (
-                    1.0,
-                    6.0,
-                ),
-                (
-                    2.0,
-                    6.0,
-                ),
-                (
-                    3.0,
-                    6.0,
-                ),
-                (
-                    4.0,
-                    6.0,
-                ),
-                (
-                    5.0,
-                    6.0,
-                ),
-                (
-                    6.0,
-                    6.0,
-                ),
-                (
-                    7.0,
-                    6.0,
-                ),
+                Position {
+                    x: 0,
+                    y: 6,
+                },
+                Position {
+                    x: 1,
+                    y: 6,
+                },
+                Position {
+                    x: 2,
+                    y: 6,
+                },
+                Position {
+                    x: 3,
+                    y: 6,
+                },
+                Position {
+                    x: 4,
+                    y: 6,
+                },
+                Position {
+                    x: 5,
+                    y: 6,
+                },
+                Position {
+                    x: 6,
+                    y: 6,
+                },
+                Position {
+                    x: 7,
+                    y: 6,
+                },
             ],
             Knight: [
-                (
-                    1.0,
-                    7.0,
-                ),
-                (
-                    6.0,
-                    7.0,
-                ),
+                Position {
+                    x: 1,
+                    y: 7,
+                },
+                Position {
+                    x: 6,
+                    y: 7,
+                },
             ],
             Bishop: [
-                (
-                    2.0,
-                    7.0,
-                ),
-                (
-                    5.0,
-                    7.0,
-                ),
+                Position {
+                    x: 2,
+                    y: 7,
+                },
+                Position {
+                    x: 5,
+                    y: 7,
+                },
             ],
             Rook: [
-                (
-                    0.0,
-                    7.0,
-                ),
-                (
-                    7.0,
-                    7.0,
-                ),
+                Position {
+                    x: 0,
+                    y: 7,
+                },
+                Position {
+                    x: 7,
+                    y: 7,
+                },
             ],
             Queen: [
-                (
-                    3.0,
-                    7.0,
-                ),
+                Position {
+                    x: 3,
+                    y: 7,
+                },
             ],
             King: [
-                (
-                    4.0,
-                    7.0,
-                ),
+                Position {
+                    x: 4,
+                    y: 7,
+                },
             ],
         }"#
     );
     expect!(&*INITIAL_BLACK_PIECES, r#"
         {
             Pawn: [
-                (
-                    0.0,
-                    1.0,
-                ),
-                (
-                    1.0,
-                    1.0,
-                ),
-                (
-                    2.0,
-                    1.0,
-                ),
-                (
-                    3.0,
-                    1.0,
-                ),
-                (
-                    4.0,
-                    1.0,
-                ),
-                (
-                    5.0,
-                    1.0,
-                ),
-                (
-                    6.0,
-                    1.0,
-                ),
-                (
-                    7.0,
-                    1.0,
-                ),
+                Position {
+                    x: 0,
+                    y: 1,
+                },
+                Position {
+                    x: 1,
+                    y: 1,
+                },
+                Position {
+                    x: 2,
+                    y: 1,
+                },
+                Position {
+                    x: 3,
+                    y: 1,
+                },
+                Position {
+                    x: 4,
+                    y: 1,
+                },
+                Position {
+                    x: 5,
+                    y: 1,
+                },
+                Position {
+                    x: 6,
+                    y: 1,
+                },
+                Position {
+                    x: 7,
+                    y: 1,
+                },
             ],
             Knight: [
-                (
-                    1.0,
-                    0.0,
-                ),
-                (
-                    6.0,
-                    0.0,
-                ),
+                Position {
+                    x: 1,
+                    y: 0,
+                },
+                Position {
+                    x: 6,
+                    y: 0,
+                },
             ],
             Bishop: [
-                (
-                    2.0,
-                    0.0,
-                ),
-                (
-                    5.0,
-                    0.0,
-                ),
+                Position {
+                    x: 2,
+                    y: 0,
+                },
+                Position {
+                    x: 5,
+                    y: 0,
+                },
             ],
             Rook: [
-                (
-                    0.0,
-                    0.0,
-                ),
-                (
-                    7.0,
-                    0.0,
-                ),
+                Position {
+                    x: 0,
+                    y: 0,
+                },
+                Position {
+                    x: 7,
+                    y: 0,
+                },
             ],
             Queen: [
-                (
-                    3.0,
-                    0.0,
-                ),
+                Position {
+                    x: 3,
+                    y: 0,
+                },
             ],
             King: [
-                (
-                    4.0,
-                    0.0,
-                ),
+                Position {
+                    x: 4,
+                    y: 0,
+                },
             ],
         }"#);
 }

@@ -14,11 +14,9 @@ impl BoardState {
         match board_move {
             BoardMove::Normal { piece, target } => {
                 match piece.state {
-                    PieceState::Moving(_) => false,
-                    PieceState::Stationary(StationaryState { cooldown, .. }) if cooldown > 0 => {
-                        false
-                    }
-                    PieceState::Stationary(StationaryState { position, .. }) => {
+                    PieceState::Moving { .. } => false,
+                    PieceState::Stationary { cooldown, .. } if cooldown > 0 => false,
+                    PieceState::Stationary { position, .. } => {
                         match piece.kind {
                             PieceKind::Pawn => {
                                 let delta = target - position;
@@ -28,17 +26,24 @@ impl BoardState {
                                 delta.y == forward_y(piece.side) && (delta.x == 0 && !is_capturing)
                                     || (delta.x.abs() == 1 && is_capturing)
                             }
+                            PieceKind::Knight => {
+                                let delta = target - position;
+                                let abs_x = delta.x.abs();
+                                let abs_y = delta.y.abs();
+                                (abs_x == 1 && abs_y == 2) || (abs_x == 2 && abs_y == 1)
+                            }
                             _ => false, // TODO: do other pieces
                         }
                     }
                 }
             }
-            _ => false, // TODO: do castling
+            BoardMove::LongCastle(_side) => false, // TODO: do castling
+            BoardMove::ShortCastle(_side) => false, // TODO: do castling
         }
     }
     fn apply_move(&mut self, board_move: BoardMove) {
         match board_move {
-            BoardMove::LongCastle(side) => {
+            BoardMove::LongCastle(_side) => {
                 // TODO
                 // let rook_position = match side {
                 //     Side::White => (0f32, 0f32),
