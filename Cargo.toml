@@ -1,0 +1,11 @@
+[package]
+name = "kfc-ml"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+enum-map = "2.4.1"
+lazy_static = "1.4.0"
+ld4-expect = { path = "../../ld4-expect" }
