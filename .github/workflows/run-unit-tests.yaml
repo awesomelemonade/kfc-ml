@@ -1,0 +1,86 @@
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ master ]
+  push:
+    branches:
+      - master
+name: Run Unit Tests
+
+env:
+  REPO: kfc-ml
+jobs:
+  check-fmt-clippy:
+    name: Check, Format, Clippy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./${{ env.REPO }}
+    steps:
+      - name: Checkout ${{ env.REPO }}
+        uses: actions/checkout@v3
+        with:
+          path: ${{ env.REPO }}
+      - name: Checkout ld4-expect
+        uses: actions/checkout@v3
+        with:
+          repository: awesomelemonade/ld4-expect
+          path: ld4-expect
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+          components: rustfmt, clippy
+      - run: cargo check
+      - run: cargo fmt --all -- --check
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features --manifest-path ./${{ env.REPO }}/Cargo.toml -- -D warnings
+          name: Clippy Output
+  test:
+    name: Run Unit Tests
+    env:
+      CARGO_INCREMENTAL: 0
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./${{ env.REPO }}
+    steps:
+      - name: Checkout ${{ env.REPO }}
+        uses: actions/checkout@v3
+        with:
+          path: ${{ env.REPO }}
+      - name: Checkout ld4-expect
+        uses: actions/checkout@v3
+        with:
+          repository: awesomelemonade/ld4-expect
+          path: ld4-expect
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+            path: |
+              ~/.cargo/bin/
+              ~/.cargo/registry/index/
+              ~/.cargo/registry/cache/
+              ~/.cargo/git/db/
+              ${{ env.REPO }}/target/
+            key: ${{ runner.os }}-cargo-${{ hashfiles('**/Cargo.lock') }}
+      - name: Install cargo2junit
+        run: cargo install cargo2junit
+        continue-on-error: true
+      - name: cargo test & convert to junit
+        run: cargo test -- -Z unstable-options --format json --report-time | cargo2junit > results.xml
+      - name: Upload test results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        if: always()
+        with:
+          check_name: Test Results
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          files: ./${{ env.REPO }}/results.xml
