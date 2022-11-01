@@ -1,6 +1,8 @@
 core!();
+
 use super::*;
 use enum_map::EnumMap;
+use itertools::Itertools;
 
 pub struct BoardState {
     pieces: Vec<Piece>,
@@ -86,7 +88,7 @@ impl BoardState {
             BoardMove::ShortCastle(_side) => false, // TODO: do castling
         }
     }
-    fn apply_move(&mut self, board_move: BoardMove) {
+    pub fn apply_move(&mut self, board_move: BoardMove) {
         match board_move {
             BoardMove::LongCastle(_side) => {
                 // TODO
@@ -107,6 +109,7 @@ impl BoardState {
                         y: y as f32,
                         target,
                     }
+                    // TODO: invalidate any castling if needed
                 };
             }
         }
@@ -116,6 +119,29 @@ impl BoardState {
     }
     fn is_occupied(&self, position: Position) -> bool {
         false // TODO
+    }
+    pub fn step(&mut self) {
+        fn is_at_target(x: f32, y: f32, target: Position) -> bool {
+            const EPSILON: f32 = 0.0001f32;
+            let dx = x - target.x as f32;
+            let dy = y - target.y as f32;
+            return dx * dx + dy * dy < EPSILON;
+        }
+        let pieces_by_priority = self
+            .pieces
+            .clone()
+            .into_iter()
+            .sorted_by_key(|piece| match piece.state {
+                PieceState::Stationary { .. } => -1i32,
+                PieceState::Moving {
+                    target: MoveTarget { priority, .. },
+                    ..
+                } => priority as i32,
+            })
+            .collect_vec();
+        // TODO-next
+
+        self.pieces = pieces_by_priority;
     }
 }
 

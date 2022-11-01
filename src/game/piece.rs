@@ -18,6 +18,7 @@ pub enum Side {
     Black,
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct Piece {
     pub side: Side,
     pub kind: PieceKind,

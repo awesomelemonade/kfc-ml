@@ -9,6 +9,7 @@ edition = "2021"
 enum-map = "2.4.1"
 lazy_static = "1.4.0"
 ld4-expect = { path = "../ld4-expect" }
+itertools = "0.10.5"
 
 [dependencies.pyo3]
 version = "0.17.2"
