@@ -8,4 +8,4 @@ edition = "2021"
 [dependencies]
 enum-map = "2.4.1"
 lazy_static = "1.4.0"
-ld4-expect = { path = "../../ld4-expect" }
+ld4-expect = { path = "../ld4-expect" }
