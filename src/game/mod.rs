@@ -6,6 +6,12 @@ pub use piece::*;
 
 mod board;
 
+mod position;
+pub use position::*;
+
+mod board_util;
+pub use board_util::*;
+
 #[cfg(test)]
 mod tests;
 
@@ -31,7 +37,7 @@ lazy_static! {
                 .char_indices()
                 .filter_map(move |(i, c)| {
                     if c == target_c {
-                        Some(((i % BOARD_SIZE) as f32, (i / BOARD_SIZE) as f32))
+                        Some(((i % BOARD_SIZE), (i / BOARD_SIZE)).into())
                     } else {
                         None
                     }
@@ -51,6 +57,6 @@ lazy_static! {
     pub static ref INITIAL_BLACK_PIECES: EnumMap<PieceKind, Vec<Position>> =
         INITIAL_WHITE_PIECES.clone().map(|_, v| v
             .iter()
-            .map(|&(x, y)| (x, BOARD_SIZE as f32 - y - 1f32))
+            .map(|&Position { x, y }| (x, BOARD_SIZE as u32 - y - 1u32).into())
             .collect());
 }
