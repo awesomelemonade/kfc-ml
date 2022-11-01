@@ -20,8 +20,6 @@ use pyo3::{
     types::{IntoPyDict, PyModule},
 };
 
-// to actually move a piece, we set the moving_target
-
 // board.calc_valid_moves_for_piece(PIECE)
 // board.calc_valid_moves()
 // board.calc_valid_next_states() # next states for combination moves

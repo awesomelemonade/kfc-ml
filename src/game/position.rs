@@ -19,6 +19,9 @@ impl Delta {
             y: self.y.clamp(min, max),
         }
     }
+    pub fn dist_l1(self) -> u32 {
+        (self.x.abs() + self.y.abs()) as u32
+    }
 }
 
 impl Add<Delta> for Position {

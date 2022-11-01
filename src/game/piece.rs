@@ -37,3 +37,14 @@ pub struct MoveTarget {
     // piece that moves first gets precedence (and eats opposing pieces in its path - the path is blocked off for its own pieces for the duration of its move)
     pub priority: u32, // priority gets incremented at every step
 }
+
+impl MoveTarget {
+    pub const MIN_PRIORITY: u32 = 0;
+    pub fn new(target: Position, turns_left: u32, priority: u32) -> Self {
+        Self {
+            target,
+            turns_left,
+            priority,
+        }
+    }
+}

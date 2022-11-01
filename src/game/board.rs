@@ -2,7 +2,7 @@ core!();
 use super::*;
 use enum_map::EnumMap;
 
-struct BoardState {
+pub struct BoardState {
     pieces: Vec<Piece>,
     can_long_castle: EnumMap<Side, bool>,
     can_short_castle: EnumMap<Side, bool>,
@@ -10,7 +10,7 @@ struct BoardState {
 }
 
 impl BoardState {
-    fn can_move(&self, board_move: BoardMove) -> bool {
+    pub fn can_move(&self, board_move: BoardMove) -> bool {
         fn get_positions_between(start: Position, end: Position) -> Vec<Position> {
             let mut vec = Vec::new();
             let mut current = start;
@@ -96,8 +96,19 @@ impl BoardState {
                 // };
                 // get starting positions of rook and king
             }
-            BoardMove::ShortCastle(side) => {}
-            BoardMove::Normal { piece, target } => {}
+            BoardMove::ShortCastle(_side) => {}
+            BoardMove::Normal { piece, target } => {
+                if let PieceState::Stationary { position, .. } = piece.state {
+                    let Position { x, y } = position;
+                    let delta = target - position;
+                    let target = MoveTarget::new(target, delta.dist_l1(), MoveTarget::MIN_PRIORITY);
+                    piece.state = PieceState::Moving {
+                        x: x as f32,
+                        y: y as f32,
+                        target,
+                    }
+                };
+            }
         }
     }
     fn get_piece(&self, position: Position) -> Option<Piece> {
@@ -108,8 +119,11 @@ impl BoardState {
     }
 }
 
-enum BoardMove {
+pub enum BoardMove<'a> {
     LongCastle(Side),
     ShortCastle(Side),
-    Normal { piece: Piece, target: Position },
+    Normal {
+        piece: &'a mut Piece,
+        target: Position,
+    },
 }
