@@ -29,8 +29,8 @@ impl BoardState {
                 }));
             }
         }
-        append_pieces(&mut pieces, Side::White, &*INITIAL_WHITE_PIECES);
-        append_pieces(&mut pieces, Side::Black, &*INITIAL_BLACK_PIECES);
+        append_pieces(&mut pieces, Side::White, &INITIAL_WHITE_PIECES);
+        append_pieces(&mut pieces, Side::Black, &INITIAL_BLACK_PIECES);
         const ENABLE_CASTLING: bool = false;
         Self {
             pieces,
@@ -50,7 +50,7 @@ impl BoardState {
             let mut vec = Vec::new();
             let mut current = start;
             loop {
-                let step = (end - start).clamp(-1, 1);
+                let step = (end - current).clamp(-1, 1);
                 current += step;
                 if current == end {
                     break;
@@ -75,7 +75,7 @@ impl BoardState {
 
                         // check that target is not occupied by friendly unit
                         // Ensure that no moving pieces has this target as the target
-                        if let Some(ref target_piece) = target_piece && target_piece.side == piece.side {
+                        if let Some(target_piece) = target_piece && target_piece.side == piece.side {
                             return false
                         }
                         match piece.kind {
@@ -83,9 +83,19 @@ impl BoardState {
                                 let delta = target - position;
                                 let is_capturing_enemy = target_piece
                                     .map_or(false, |target_piece| piece.side != target_piece.side);
-                                delta.y == forward_y(piece.side)
-                                    && (delta.x == 0 && !is_capturing_enemy)
-                                    || (delta.x.abs() == 1 && is_capturing_enemy)
+                                let can_normal_move = delta.y == forward_y(piece.side)
+                                    && ((delta.x == 0 && !is_capturing_enemy)
+                                        || (delta.x.abs() == 1 && is_capturing_enemy));
+                                let is_in_starting_rank = position.y
+                                    == match piece.side {
+                                        Side::White => 6,
+                                        Side::Black => 1,
+                                    };
+                                let can_double_move = delta.x == 0
+                                    && delta.y == forward_y(piece.side) * 2
+                                    && !is_capturing_enemy
+                                    && is_in_starting_rank;
+                                can_normal_move || can_double_move
                             }
                             PieceKind::Knight => {
                                 let delta = target - position;

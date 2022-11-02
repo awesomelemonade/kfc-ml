@@ -27,15 +27,15 @@ use pyo3::{
 // board.step(moves) // Also resolves collisions
 
 // As input to an ML model - impl from board?
-struct BoardRepresentation {
-    // for each side
-    // pawn -> 8 slots
-    // rook -> 2 slots
-    // knight -> 2 slots
-    // bishop -> 2 slots
-    // queen -> 2 slots // extra slot for queens for promotion
-    // king -> 1 slot
-}
+// struct BoardRepresentation {
+//     // for each side
+//     // pawn -> 8 slots
+//     // rook -> 2 slots
+//     // knight -> 2 slots
+//     // bishop -> 2 slots
+//     // queen -> 2 slots // extra slot for queens for promotion
+//     // king -> 1 slot
+// }
 
 fn main() -> PyResult<()> {
     Python::with_gil(|py| {

@@ -1,6 +1,14 @@
 core!();
 
+use itertools::Itertools;
+
 use super::*;
+
+#[test]
+fn test_forward_y() {
+    expect!(forward_y(Side::White), "-1");
+    expect!(forward_y(Side::Black), "1");
+}
 
 #[test]
 fn test_initial_white_pieces() {
@@ -185,5 +193,66 @@ fn test_initial_board_state() {
     expect!(
         piece_types,
         r#""RNBQKBNR\nPPPPPPPP\n........\n........\n........\n........\nPPPPPPPP\nRNBQKBNR""#
+    );
+}
+
+#[test]
+fn test_initial_possible_moves() {
+    let board = BoardState::new_initial_state();
+    let moves = board.get_all_possible_moves(Side::White);
+    let all_kinds = vec![
+        PieceKind::Pawn,
+        PieceKind::Knight,
+        PieceKind::Bishop,
+        PieceKind::Rook,
+        PieceKind::Queen,
+        PieceKind::King,
+    ];
+    let num_moves_per_type = all_kinds
+        .iter()
+        .map(|&kind| {
+            let count = moves
+                .iter()
+                .filter(|board_move| {
+                    if let BoardMove::Normal { piece, .. } = board_move {
+                        piece.kind == kind
+                    } else {
+                        false
+                    }
+                })
+                .count();
+            (kind, count)
+        })
+        .collect_vec();
+    expect!(moves.len(), "20");
+    expect!(
+        num_moves_per_type,
+        r#"
+        [
+            (
+                Pawn,
+                16,
+            ),
+            (
+                Knight,
+                4,
+            ),
+            (
+                Bishop,
+                0,
+            ),
+            (
+                Rook,
+                0,
+            ),
+            (
+                Queen,
+                0,
+            ),
+            (
+                King,
+                0,
+            ),
+        ]"#
     );
 }
