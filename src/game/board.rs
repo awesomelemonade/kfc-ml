@@ -35,8 +35,11 @@ impl BoardState {
                         if position == target {
                             return false;
                         }
-                        let target_piece = self.get_piece(target);
+                        let target_piece =
+                            self.get_piece_including_moving_on_side(target, piece.side);
 
+                        // check that target is not occupied by friendly unit
+                        // Ensure that no moving pieces has this target as the target
                         if let Some(ref target_piece) = target_piece && target_piece.side == piece.side {
                             return false
                         }
@@ -56,13 +59,12 @@ impl BoardState {
                                 (abs_x == 1 && abs_y == 2) || (abs_x == 2 && abs_y == 1)
                             }
                             PieceKind::Bishop | PieceKind::Rook | PieceKind::Queen => {
-                                // check that target is not occupied by friendly unit
-                                let target_has_friendly = target_piece
-                                    .map_or(false, |target_piece| target_piece.side == piece.side);
                                 // check if every square in its path is not occupied by unit
-                                let path_is_occupied = get_positions_between(position, target)
-                                    .iter()
-                                    .any(|&pos| self.is_occupied(pos));
+                                let path_is_occupied =
+                                    get_positions_between(position, target).iter().any(|&pos| {
+                                        self.get_piece_including_moving_on_side(pos, piece.side)
+                                            .is_some()
+                                    });
                                 // check if the piece can go on this delta
                                 let delta = target - position;
                                 let is_straight = delta.x == 0 || delta.y == 0;
@@ -73,7 +75,7 @@ impl BoardState {
                                     PieceKind::Queen => is_straight || is_diagonal,
                                     _ => false,
                                 };
-                                !target_has_friendly && !path_is_occupied && allowed_delta
+                                !path_is_occupied && allowed_delta
                             }
                             PieceKind::King => {
                                 let delta = target - position;
@@ -113,11 +115,24 @@ impl BoardState {
             }
         }
     }
-    fn get_piece(&self, position: Position) -> Option<Piece> {
+    fn get_stationary_piece(&self, position: Position) -> Option<Piece> {
         None // TODO
     }
-    fn is_occupied(&self, position: Position) -> bool {
-        false // TODO
+    fn is_occupied_by_stationary_piece(&self, position: Position) -> bool {
+        // TODO: optimize
+        self.get_stationary_piece(position).is_some()
+    }
+    fn get_piece_including_moving_on_side(&self, position: Position, side: Side) -> Option<&Piece> {
+        self.pieces.iter().find(|piece| match piece.state {
+            PieceState::Stationary {
+                position: piece_position,
+                ..
+            } => position == piece_position,
+            PieceState::Moving {
+                target: MoveTarget { target, .. },
+                ..
+            } => side == piece.side && position == target,
+        })
     }
     pub fn step(&mut self) {
         fn position_after_step(piece_state: &PieceState, step_size: f32) -> (f32, f32) {
@@ -160,12 +175,7 @@ impl BoardState {
                 } => priority + 1u32,
             }
         }
-        fn can_be_captured(
-            priority: u32,
-            new_position: (f32, f32),
-            piece: &Piece,
-            capturer: &Piece,
-        ) -> bool {
+        fn can_be_captured(priority: u32, new_position: (f32, f32), capturer: &Piece) -> bool {
             if priority <= get_priority(capturer) {
                 match capturer.kind {
                     // if the piece is a knight, it never intersects unless this is the moving knight's target
@@ -191,7 +201,7 @@ impl BoardState {
                 let new_position = position_after_step(&piece.state, 1f32);
                 // check if any intersect
                 let intersects = self.pieces.iter().any(|capturer| {
-                    can_be_captured(priority, new_position, piece, capturer)
+                    can_be_captured(priority, new_position, capturer)
                         && pieces_intersect(piece, capturer)
                 });
                 if intersects {
@@ -203,14 +213,13 @@ impl BoardState {
                             cooldown: cooldown.saturating_sub(1),
                         },
                         PieceState::Moving {
-                            x,
-                            y,
                             target:
                                 MoveTarget {
                                     target,
                                     turns_left,
                                     priority,
                                 },
+                            ..
                         } => {
                             if turns_left == 1 {
                                 PieceState::Stationary {
