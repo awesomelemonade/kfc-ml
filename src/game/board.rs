@@ -11,6 +11,20 @@ pub struct BoardState {
 }
 
 impl BoardState {
+    fn new_with_castling(pieces: Vec<Piece>, enable_castling: bool) -> Self {
+        Self {
+            pieces,
+            can_long_castle: enum_map! {
+                Side::White => enable_castling,
+                Side::Black => enable_castling,
+            },
+            can_short_castle: enum_map! {
+                Side::White => enable_castling,
+                Side::Black => enable_castling,
+            },
+        }
+    }
+
     pub fn new_initial_state() -> Self {
         let mut pieces = Vec::new();
         fn append_pieces(
@@ -31,19 +45,8 @@ impl BoardState {
         }
         append_pieces(&mut pieces, Side::White, &INITIAL_WHITE_PIECES);
         append_pieces(&mut pieces, Side::Black, &INITIAL_BLACK_PIECES);
-        const ENABLE_CASTLING: bool = false;
-        Self {
-            pieces,
-            // TODO: Support Castling
-            can_long_castle: enum_map! {
-                Side::White => ENABLE_CASTLING,
-                Side::Black => ENABLE_CASTLING,
-            },
-            can_short_castle: enum_map! {
-                Side::White => ENABLE_CASTLING,
-                Side::Black => ENABLE_CASTLING,
-            },
-        }
+        // TODO: Support Castling
+        Self::new_with_castling(pieces, false)
     }
     pub fn can_move(&self, board_move: &BoardMove) -> bool {
         fn get_positions_between(start: Position, end: Position) -> Vec<Position> {
@@ -88,7 +91,7 @@ impl BoardState {
                                         || (delta.x.abs() == 1 && is_capturing_enemy));
                                 let is_in_starting_rank = position.y
                                     == match piece.side {
-                                        Side::White => 6,
+                                        Side::White => BOARD_SIZE as u32 - 2,
                                         Side::Black => 1,
                                     };
                                 let can_double_move = delta.x == 0
@@ -104,12 +107,6 @@ impl BoardState {
                                 (abs_x == 1 && abs_y == 2) || (abs_x == 2 && abs_y == 1)
                             }
                             PieceKind::Bishop | PieceKind::Rook | PieceKind::Queen => {
-                                // check if every square in its path is not occupied by unit
-                                let path_is_occupied =
-                                    get_positions_between(position, target).iter().any(|&pos| {
-                                        self.get_piece_including_moving_on_side(pos, piece.side)
-                                            .is_some()
-                                    });
                                 // check if the piece can go on this delta
                                 let delta = target - position;
                                 let is_straight = delta.x == 0 || delta.y == 0;
@@ -120,7 +117,18 @@ impl BoardState {
                                     PieceKind::Queen => is_straight || is_diagonal,
                                     _ => false,
                                 };
-                                !path_is_occupied && allowed_delta
+                                if allowed_delta {
+                                    // check if every square in its path is not occupied by unit
+                                    let path_is_occupied = get_positions_between(position, target)
+                                        .iter()
+                                        .any(|&pos| {
+                                            self.get_piece_including_moving_on_side(pos, piece.side)
+                                                .is_some()
+                                        });
+                                    !path_is_occupied
+                                } else {
+                                    false
+                                }
                             }
                             PieceKind::King => {
                                 let delta = target - position;
@@ -301,9 +309,26 @@ impl BoardState {
                             }
                         }
                     };
+                    let kind = if let PieceState::Stationary { position, .. } = piece.state {
+                        // check if it's a pawn promotion
+                        let is_pawn_promotion = piece.kind == PieceKind::Pawn
+                            && position.y
+                                == match piece.side {
+                                    Side::White => 0u32,
+                                    Side::Black => BOARD_SIZE as u32 - 1u32,
+                                };
+                        if is_pawn_promotion {
+                            PieceKind::Queen
+                        } else {
+                            piece.kind
+                        }
+                    } else {
+                        piece.kind
+                    };
+
                     Some(Piece {
                         side: piece.side,
-                        kind: piece.kind,
+                        kind,
                         state: new_state,
                     })
                 }
@@ -359,6 +384,37 @@ impl BoardState {
             Side::White => 'W',
             Side::Black => 'B',
         })
+    }
+    pub fn parse_fen(fen: &str) -> OrError<Self> {
+        let mut pieces = Vec::new();
+        for (row, line) in fen.split('/').enumerate() {
+            let mut cursor = 0;
+            for c in line.chars() {
+                if c.is_ascii_digit() {
+                    cursor += c.to_digit(10).unwrap();
+                } else {
+                    if let Some(kind) = PieceKind::from_char(c.to_ascii_uppercase()) {
+                        let side = match c.is_ascii_uppercase() {
+                            true => Side::White,
+                            false => Side::Black,
+                        };
+                        let position = (cursor, row as u32).into();
+                        pieces.push(Piece {
+                            side,
+                            kind,
+                            state: PieceState::Stationary {
+                                position,
+                                cooldown: 0u32,
+                            },
+                        })
+                    } else {
+                        return Err(Error!("Unable to parse piece kind {} in {}", c, line));
+                    }
+                    cursor += 1;
+                }
+            }
+        }
+        Ok(Self::new_with_castling(pieces, false))
     }
 }
 

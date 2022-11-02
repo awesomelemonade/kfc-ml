@@ -196,10 +196,7 @@ fn test_initial_board_state() {
     );
 }
 
-#[test]
-fn test_initial_possible_moves() {
-    let board = BoardState::new_initial_state();
-    let moves = board.get_all_possible_moves(Side::White);
+fn num_moves_per_type(moves: &Vec<BoardMove>) -> Vec<(PieceKind, usize)> {
     let all_kinds = vec![
         PieceKind::Pawn,
         PieceKind::Knight,
@@ -208,7 +205,7 @@ fn test_initial_possible_moves() {
         PieceKind::Queen,
         PieceKind::King,
     ];
-    let num_moves_per_type = all_kinds
+    all_kinds
         .iter()
         .map(|&kind| {
             let count = moves
@@ -223,7 +220,14 @@ fn test_initial_possible_moves() {
                 .count();
             (kind, count)
         })
-        .collect_vec();
+        .collect_vec()
+}
+
+#[test]
+fn test_initial_possible_moves() {
+    let board = BoardState::new_initial_state();
+    let moves = board.get_all_possible_moves(Side::White);
+    let num_moves_per_type = num_moves_per_type(&moves);
     expect!(moves.len(), "20");
     expect!(
         num_moves_per_type,
@@ -252,6 +256,44 @@ fn test_initial_possible_moves() {
             (
                 King,
                 0,
+            ),
+        ]"#
+    );
+}
+
+#[test]
+fn test_random_state_possible_moves() {
+    let board = BoardState::parse_fen("3N4/b3P3/5p1B/2Q2bPP/PnK5/r5N1/7k/3r4").unwrap();
+    let moves = board.get_all_possible_moves(Side::White);
+    let num_moves_per_type = num_moves_per_type(&moves);
+    expect!(moves.len(), "38");
+    expect!(
+        num_moves_per_type,
+        r#"
+        [
+            (
+                Pawn,
+                4,
+            ),
+            (
+                Knight,
+                9,
+            ),
+            (
+                Bishop,
+                2,
+            ),
+            (
+                Rook,
+                0,
+            ),
+            (
+                Queen,
+                16,
+            ),
+            (
+                King,
+                7,
             ),
         ]"#
     );

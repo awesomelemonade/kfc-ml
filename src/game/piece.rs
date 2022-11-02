@@ -12,6 +12,20 @@ pub enum PieceKind {
     King,
 }
 
+impl PieceKind {
+    pub fn from_char(value: char) -> Option<PieceKind> {
+        match value {
+            'P' => Some(PieceKind::Pawn),
+            'N' => Some(PieceKind::Knight),
+            'B' => Some(PieceKind::Bishop),
+            'R' => Some(PieceKind::Rook),
+            'Q' => Some(PieceKind::Queen),
+            'K' => Some(PieceKind::King),
+            _ => None,
+        }
+    }
+}
+
 impl From<PieceKind> for char {
     fn from(kind: PieceKind) -> Self {
         match kind {
