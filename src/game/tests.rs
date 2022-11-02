@@ -173,3 +173,17 @@ fn test_initial_black_pieces() {
         }"#
     );
 }
+
+#[test]
+fn test_initial_board_state() {
+    let colors = BoardState::new_initial_state().to_stationary_map_color();
+    let piece_types = BoardState::new_initial_state().to_stationary_map_type();
+    expect!(
+        colors,
+        r#""BBBBBBBB\nBBBBBBBB\n........\n........\n........\n........\nWWWWWWWW\nWWWWWWWW""#
+    );
+    expect!(
+        piece_types,
+        r#""RNBQKBNR\nPPPPPPPP\n........\n........\n........\n........\nPPPPPPPP\nRNBQKBNR""#
+    );
+}

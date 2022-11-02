@@ -3,14 +3,48 @@ core!();
 use super::*;
 use enum_map::EnumMap;
 
+#[derive(Debug)]
 pub struct BoardState {
     pieces: Vec<Piece>,
     can_long_castle: EnumMap<Side, bool>,
     can_short_castle: EnumMap<Side, bool>,
-    occupied: [[bool; BOARD_SIZE]; BOARD_SIZE],
 }
 
 impl BoardState {
+    pub fn new_initial_state() -> Self {
+        let mut pieces = Vec::new();
+        fn append_pieces(
+            pieces: &mut Vec<Piece>,
+            side: Side,
+            map: &EnumMap<PieceKind, Vec<Position>>,
+        ) {
+            for (kind, positions) in map {
+                pieces.extend(positions.iter().map(|&position| Piece {
+                    side,
+                    kind,
+                    state: PieceState::Stationary {
+                        position,
+                        cooldown: 0u32,
+                    },
+                }));
+            }
+        }
+        append_pieces(&mut pieces, Side::White, &*INITIAL_WHITE_PIECES);
+        append_pieces(&mut pieces, Side::Black, &*INITIAL_BLACK_PIECES);
+        const ENABLE_CASTLING: bool = false;
+        Self {
+            pieces,
+            // TODO: Support Castling
+            can_long_castle: enum_map! {
+                Side::White => ENABLE_CASTLING,
+                Side::Black => ENABLE_CASTLING,
+            },
+            can_short_castle: enum_map! {
+                Side::White => ENABLE_CASTLING,
+                Side::Black => ENABLE_CASTLING,
+            },
+        }
+    }
     pub fn can_move(&self, board_move: &BoardMove) -> bool {
         fn get_positions_between(start: Position, end: Position) -> Vec<Position> {
             let mut vec = Vec::new();
@@ -119,6 +153,15 @@ impl BoardState {
                 };
             }
         }
+    }
+    fn get_stationary_piece(&self, position: Position) -> Option<&Piece> {
+        self.pieces.iter().find(|piece| match piece.state {
+            PieceState::Stationary {
+                position: piece_position,
+                ..
+            } => position == piece_position,
+            PieceState::Moving { .. } => false,
+        })
     }
     fn get_stationary_piece_mut(&mut self, position: Position) -> Option<&mut Piece> {
         self.pieces.iter_mut().find(|piece| match piece.state {
@@ -281,6 +324,31 @@ impl BoardState {
             }
         }
         moves
+    }
+    pub fn to_stationary_map<F>(&self, default_char: char, f: F) -> String
+    where
+        F: Fn(&Piece) -> char,
+    {
+        let mut all: Vec<String> = Vec::new();
+        for row in 0..BOARD_SIZE {
+            let mut buffer = Vec::new();
+            for col in 0..BOARD_SIZE {
+                let piece = self.get_stationary_piece((col, row).into());
+                let c = piece.map_or(default_char, &f);
+                buffer.push(c);
+            }
+            all.push(buffer.iter().collect());
+        }
+        all.join("\n")
+    }
+    pub fn to_stationary_map_type(&self) -> String {
+        self.to_stationary_map('.', |piece| piece.kind.into())
+    }
+    pub fn to_stationary_map_color(&self) -> String {
+        self.to_stationary_map('.', |piece| match piece.side {
+            Side::White => 'W',
+            Side::Black => 'B',
+        })
     }
 }
 

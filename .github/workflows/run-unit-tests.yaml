@@ -37,7 +37,7 @@ jobs:
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features --manifest-path ./$REPO/Cargo.toml -- -D warnings
+          args: --all-features --manifest-path ./${{ env.REPO }}/Cargo.toml -- -D warnings
           name: Clippy Output
   test:
     name: Run Unit Tests

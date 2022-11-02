@@ -12,6 +12,19 @@ pub enum PieceKind {
     King,
 }
 
+impl From<PieceKind> for char {
+    fn from(kind: PieceKind) -> Self {
+        match kind {
+            PieceKind::Pawn => 'P',
+            PieceKind::Knight => 'N',
+            PieceKind::Bishop => 'B',
+            PieceKind::Rook => 'R',
+            PieceKind::Queen => 'Q',
+            PieceKind::King => 'K',
+        }
+    }
+}
+
 #[derive(Debug, Enum, Copy, Clone, PartialEq, Eq)]
 pub enum Side {
     White,

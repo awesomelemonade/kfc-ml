@@ -5,6 +5,7 @@ mod piece;
 pub use piece::*;
 
 mod board;
+pub use board::*;
 
 mod position;
 pub use position::*;
