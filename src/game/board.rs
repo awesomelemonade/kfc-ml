@@ -11,7 +11,7 @@ pub struct BoardState {
 }
 
 impl BoardState {
-    pub fn can_move(&self, board_move: BoardMove) -> bool {
+    pub fn can_move(&self, board_move: &BoardMove) -> bool {
         fn get_positions_between(start: Position, end: Position) -> Vec<Position> {
             let mut vec = Vec::new();
             let mut current = start;
@@ -28,6 +28,7 @@ impl BoardState {
         }
         match board_move {
             BoardMove::Normal { piece, target } => {
+                let target = *target;
                 match piece.state {
                     PieceState::Moving { .. } => false,
                     PieceState::Stationary { cooldown, .. } if cooldown > 0 => false,
@@ -104,23 +105,29 @@ impl BoardState {
                 if let PieceState::Stationary { position, .. } = piece.state {
                     let Position { x, y } = position;
                     let delta = target - position;
-                    let target = MoveTarget::new(target, delta.dist_l1(), MoveTarget::MIN_PRIORITY);
-                    piece.state = PieceState::Moving {
-                        x: x as f32,
-                        y: y as f32,
-                        target,
+                    let target =
+                        MoveTarget::new(target, delta.dist_linf(), MoveTarget::MIN_PRIORITY);
+                    // TODO: somehow optimize so we don't have to loop through?
+                    if let Some(piece) = self.get_stationary_piece_mut(position) {
+                        piece.state = PieceState::Moving {
+                            x: x as f32,
+                            y: y as f32,
+                            target,
+                        }
                     }
                     // TODO: invalidate any castling if needed
                 };
             }
         }
     }
-    fn get_stationary_piece(&self, position: Position) -> Option<Piece> {
-        None // TODO
-    }
-    fn is_occupied_by_stationary_piece(&self, position: Position) -> bool {
-        // TODO: optimize
-        self.get_stationary_piece(position).is_some()
+    fn get_stationary_piece_mut(&mut self, position: Position) -> Option<&mut Piece> {
+        self.pieces.iter_mut().find(|piece| match piece.state {
+            PieceState::Stationary {
+                position: piece_position,
+                ..
+            } => position == piece_position,
+            PieceState::Moving { .. } => false,
+        })
     }
     fn get_piece_including_moving_on_side(&self, position: Position, side: Side) -> Option<&Piece> {
         self.pieces.iter().find(|piece| match piece.state {
@@ -201,7 +208,8 @@ impl BoardState {
                 let new_position = position_after_step(&piece.state, 1f32);
                 // check if any intersect
                 let intersects = self.pieces.iter().any(|capturer| {
-                    can_be_captured(priority, new_position, capturer)
+                    piece.side != capturer.side
+                        && can_be_captured(priority, new_position, capturer)
                         && pieces_intersect(piece, capturer)
                 });
                 if intersects {
@@ -249,13 +257,36 @@ impl BoardState {
             })
             .collect();
     }
+    pub fn get_all_possible_moves(&self, side: Side) -> Vec<BoardMove> {
+        let mut moves: Vec<BoardMove> = Vec::new();
+        // handle castling
+        if self.can_long_castle[side] {
+            moves.push(BoardMove::LongCastle(side));
+        }
+        if self.can_short_castle[side] {
+            moves.push(BoardMove::ShortCastle(side));
+        }
+        for piece in self.pieces.iter().cloned() {
+            if piece.side == side {
+                // loop through all squares
+                for i in 0..BOARD_SIZE {
+                    for j in 0..BOARD_SIZE {
+                        let target = (i, j).into();
+                        let board_move = BoardMove::Normal { piece, target };
+                        if self.can_move(&board_move) {
+                            moves.push(board_move);
+                        }
+                    }
+                }
+            }
+        }
+        moves
+    }
 }
 
-pub enum BoardMove<'a> {
+#[derive(Debug)]
+pub enum BoardMove {
     LongCastle(Side),
     ShortCastle(Side),
-    Normal {
-        piece: &'a mut Piece,
-        target: Position,
-    },
+    Normal { piece: Piece, target: Position },
 }
