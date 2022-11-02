@@ -6,6 +6,15 @@ pub struct Position {
     pub y: u32,
 }
 
+impl Position {
+    pub fn round_and_from(x: f32, y: f32) -> Self {
+        Self {
+            x: x.round() as u32,
+            y: y.round() as u32,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Delta {
     pub x: i32,
@@ -64,5 +73,11 @@ impl From<(usize, usize)> for Position {
             x: x as u32,
             y: y as u32,
         }
+    }
+}
+
+impl From<Position> for (f32, f32) {
+    fn from(position: Position) -> (f32, f32) {
+        (position.x as f32, position.y as f32)
     }
 }

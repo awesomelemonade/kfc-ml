@@ -2,7 +2,6 @@ core!();
 
 use super::*;
 use enum_map::EnumMap;
-use itertools::Itertools;
 
 pub struct BoardState {
     pieces: Vec<Piece>,
@@ -121,27 +120,125 @@ impl BoardState {
         false // TODO
     }
     pub fn step(&mut self) {
-        fn is_at_target(x: f32, y: f32, target: Position) -> bool {
-            const EPSILON: f32 = 0.0001f32;
-            let dx = x - target.x as f32;
-            let dy = y - target.y as f32;
-            return dx * dx + dy * dy < EPSILON;
+        fn position_after_step(piece_state: &PieceState, step_size: f32) -> (f32, f32) {
+            match piece_state {
+                PieceState::Stationary { position, .. } => (position.x as f32, position.y as f32),
+                PieceState::Moving {
+                    x,
+                    y,
+                    target:
+                        MoveTarget {
+                            target, turns_left, ..
+                        },
+                } => {
+                    let progress = step_size / (*turns_left as f32);
+                    let new_x = (target.x as f32 - x) * progress + x;
+                    let new_y = (target.y as f32 - y) * progress + y;
+                    (new_x, new_y)
+                }
+            }
         }
-        let pieces_by_priority = self
-            .pieces
-            .clone()
-            .into_iter()
-            .sorted_by_key(|piece| match piece.state {
-                PieceState::Stationary { .. } => -1i32,
+        fn intersects((x, y): (f32, f32), (x2, y2): (f32, f32)) -> bool {
+            let dx = x - x2;
+            let dy = y - y2;
+            dx * dx + dy * dy <= 1f32
+        }
+        fn pieces_intersect(a: &Piece, b: &Piece) -> bool {
+            // TODO: can be made continuous
+            let a2 = position_after_step(&a.state, 0.5f32);
+            let b2 = position_after_step(&b.state, 0.5f32);
+            let a3 = position_after_step(&a.state, 1f32);
+            let b3 = position_after_step(&b.state, 1f32);
+            intersects(a2, b2) || intersects(a3, b3)
+        }
+        fn get_priority(piece: &Piece) -> u32 {
+            match piece.state {
+                PieceState::Stationary { .. } => 0u32,
                 PieceState::Moving {
                     target: MoveTarget { priority, .. },
                     ..
-                } => priority as i32,
+                } => priority + 1u32,
+            }
+        }
+        fn can_be_captured(
+            priority: u32,
+            new_position: (f32, f32),
+            piece: &Piece,
+            capturer: &Piece,
+        ) -> bool {
+            if priority <= get_priority(capturer) {
+                match capturer.kind {
+                    // if the piece is a knight, it never intersects unless this is the moving knight's target
+                    PieceKind::Knight => match capturer.state {
+                        PieceState::Stationary { .. } => false,
+                        PieceState::Moving {
+                            target: MoveTarget { target, .. },
+                            ..
+                        } => intersects(new_position, target.into()),
+                    },
+                    _ => true,
+                }
+            } else {
+                false
+            }
+        }
+        // Two moving pieces with the same priority needs to both get captured
+        self.pieces = self
+            .pieces
+            .iter()
+            .filter_map(|piece| {
+                let priority = get_priority(piece);
+                let new_position = position_after_step(&piece.state, 1f32);
+                // check if any intersect
+                let intersects = self.pieces.iter().any(|capturer| {
+                    can_be_captured(priority, new_position, piece, capturer)
+                        && pieces_intersect(piece, capturer)
+                });
+                if intersects {
+                    None
+                } else {
+                    let new_state = match piece.state {
+                        PieceState::Stationary { position, cooldown } => PieceState::Stationary {
+                            position,
+                            cooldown: cooldown.saturating_sub(1),
+                        },
+                        PieceState::Moving {
+                            x,
+                            y,
+                            target:
+                                MoveTarget {
+                                    target,
+                                    turns_left,
+                                    priority,
+                                },
+                        } => {
+                            if turns_left == 1 {
+                                PieceState::Stationary {
+                                    position: target,
+                                    cooldown: PIECE_COOLDOWN,
+                                }
+                            } else {
+                                let (new_x, new_y) = new_position;
+                                PieceState::Moving {
+                                    x: new_x,
+                                    y: new_y,
+                                    target: MoveTarget {
+                                        target,
+                                        turns_left: turns_left - 1,
+                                        priority: priority + 1,
+                                    },
+                                }
+                            }
+                        }
+                    };
+                    Some(Piece {
+                        side: piece.side,
+                        kind: piece.kind,
+                        state: new_state,
+                    })
+                }
             })
-            .collect_vec();
-        // TODO-next
-
-        self.pieces = pieces_by_priority;
+            .collect();
     }
 }
 

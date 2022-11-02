@@ -16,6 +16,7 @@ pub use board_util::*;
 mod tests;
 
 pub const BOARD_SIZE: usize = 8;
+pub const PIECE_COOLDOWN: u32 = 10;
 
 lazy_static! {
     pub static ref INITIAL_WHITE_PIECES: EnumMap<PieceKind, Vec<Position>> = {
