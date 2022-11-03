@@ -16,6 +16,9 @@ pub use board_util::*;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod step_tests;
+
 pub const BOARD_SIZE: usize = 8;
 pub const PIECE_COOLDOWN: u32 = 10;
 
