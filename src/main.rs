@@ -15,6 +15,9 @@ mod imports;
 mod game;
 pub use game::*;
 
+mod minimax;
+use minimax::white_move;
+
 use pyo3::{
     prelude::*,
     types::{IntoPyDict, PyModule},
@@ -38,6 +41,12 @@ use pyo3::{
 // }
 
 fn main() -> PyResult<()> {
+    let board = BoardState::parse_fen("3N4/b3P3/5p1B/2Q2bPP/PnK5/r5N1/7k/3r4").unwrap();
+
+    let mut best_moves = Vec::new();
+    let score = white_move(&board, 0, &mut best_moves);
+    println!("score={}, moves={:?}", score, best_moves);
+
     Python::with_gil(|py| {
         let activators = PyModule::from_code(
             py,

@@ -3,7 +3,7 @@ core!();
 use super::*;
 use enum_map::EnumMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoardState {
     pieces: Vec<Piece>,
     can_long_castle: EnumMap<Side, bool>,
@@ -11,6 +11,10 @@ pub struct BoardState {
 }
 
 impl BoardState {
+    pub fn pieces(&self) -> &Vec<Piece> {
+        &self.pieces
+    }
+
     fn new_with_castling(pieces: Vec<Piece>, enable_castling: bool) -> Self {
         Self {
             pieces,
@@ -428,15 +432,13 @@ impl BoardState {
     }
     // TODO: Use ForTest?
     pub fn is_all_pieces_stationary(&self) -> bool {
-        // TODO: needs a piece.is_stationary() by deriving some enum
-        self.pieces.iter().all(|piece| match piece.state {
-            PieceState::Stationary { .. } => true,
-            _ => false,
-        })
+        self.pieces
+            .iter()
+            .all(|piece| matches!(piece.state, PieceState::Stationary { .. }))
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BoardMove {
     LongCastle(Side),
     ShortCastle(Side),
