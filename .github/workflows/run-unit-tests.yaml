@@ -44,8 +44,8 @@ jobs:
         with:
           command: build
           args: --profile=release-with-debug --all-features --manifest-path ./${{ env.REPO }}/Cargo.toml
-      # - name: Configure for perf
-      #   run: sudo sysctl -w kernel.perf_event_paranoid=1
+      - name: Configure for perf
+        run: sudo sysctl -w kernel.perf_event_paranoid=1
       # - name: Run Coz
       #   run: ./generate-coz-profile.sh
       # - name: Archive profile
