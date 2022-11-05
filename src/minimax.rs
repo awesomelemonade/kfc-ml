@@ -32,8 +32,7 @@ pub fn evaluate_material_heuristic(state: &BoardState) -> f32 {
 }
 
 pub fn white_move(state: &BoardState, depth: u32) -> (Option<BoardMove>, f32) {
-    // coz::progress!();
-    coz::scope!("foo");
+    coz::progress!("white_move");
     if depth >= 2 {
         return (None, evaluate_material_heuristic(state));
     }
