@@ -37,9 +37,8 @@ jobs:
         with:
           command: build
           args: --profile=release-with-debug --all-features --manifest-path ./${{ env.REPO }}/Cargo.toml
-      - run: ls
       - name: Run Coz
-        run: coz run --- ./target/release-with-debug/${{ env.REPO }}
+        run: sudo coz run --- ./target/release-with-debug/${{ env.REPO }}
       - name: Archive profile
         uses: actions/upload-artifact@v2
         with:
