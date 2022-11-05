@@ -40,6 +40,7 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
+          components: flamegraph
       - uses: actions-rs/cargo@v1
         with:
           command: build
@@ -53,6 +54,14 @@ jobs:
         with:
           name: profile.coz
           path: ./${{ env.REPO }}/profile.coz
+          retention-days: 30
+      - run: sudo apt install linux-tools-common linux-tools-generic linux-tools-`uname -r`
+      - run: flamegraph -o my_flamegraph.svg -- ./target/release-with-debug/kfc-ml
+      - name: Archive flamegraph
+        uses: actions/upload-artifact@v2
+        with:
+          name: my_flamegraph.svg
+          path: ./${{ env.REPO }}/my_flamegraph.svg
           retention-days: 30
   check-fmt-clippy:
     name: Check, Format, Clippy
