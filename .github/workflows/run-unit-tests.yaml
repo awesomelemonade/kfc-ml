@@ -36,7 +36,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --profile=release-with-debug --all-features
+          args: --profile=release-with-debug --all-features --manifest-path ./${{ env.REPO }}/Cargo.toml
       - name: Run Coz
         run: coz run --- ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
       - name: Archive profile
