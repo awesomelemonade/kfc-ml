@@ -47,7 +47,7 @@ jobs:
       - name: Configure for perf
         run: sudo sysctl -w kernel.perf_event_paranoid=1
       - name: Run Coz
-        run: coz run --- ./target/release-with-debug/${{ env.REPO }}
+        run: ./generate-coz-profile.sh
       - name: Archive profile
         uses: actions/upload-artifact@v2
         with:
