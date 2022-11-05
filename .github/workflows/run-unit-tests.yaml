@@ -40,21 +40,21 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
-          components: flamegraph
       - uses: actions-rs/cargo@v1
         with:
           command: build
           args: --profile=release-with-debug --all-features --manifest-path ./${{ env.REPO }}/Cargo.toml
-      - name: Configure for perf
-        run: sudo sysctl -w kernel.perf_event_paranoid=1
-      - name: Run Coz
-        run: ./generate-coz-profile.sh
-      - name: Archive profile
-        uses: actions/upload-artifact@v2
-        with:
-          name: profile.coz
-          path: ./${{ env.REPO }}/profile.coz
-          retention-days: 30
+      # - name: Configure for perf
+      #   run: sudo sysctl -w kernel.perf_event_paranoid=1
+      # - name: Run Coz
+      #   run: ./generate-coz-profile.sh
+      # - name: Archive profile
+      #   uses: actions/upload-artifact@v2
+      #   with:
+      #     name: profile.coz
+      #     path: ./${{ env.REPO }}/profile.coz
+      #     retention-days: 30
+      - run: cargo install flamegraph
       - run: sudo apt install linux-tools-common linux-tools-generic linux-tools-`uname -r`
       - run: flamegraph -o my_flamegraph.svg -- ./target/release-with-debug/kfc-ml
       - name: Archive flamegraph
