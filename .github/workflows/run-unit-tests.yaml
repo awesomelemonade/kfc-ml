@@ -38,9 +38,7 @@ jobs:
           command: build
           args: --profile=release-with-debug --all-features
       - name: Run Coz
-        run: coz run --- ./${{ env.REPO }}/target/release/${{ env.REPO }}
-      - name: ls
-        run: ls
+        run: coz run --- ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
       - name: Archive profile
         uses: actions/upload-artifact@v2
         with:
