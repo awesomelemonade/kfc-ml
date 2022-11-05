@@ -37,15 +37,14 @@ jobs:
         with:
           command: build
           args: --profile=release-with-debug --all-features --manifest-path ./${{ env.REPO }}/Cargo.toml
-      - run: ls kfc-ml
-      - run: ls kfc-ml/target/
+      - run: ls
       - name: Run Coz
-        run: coz run --- ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
+        run: coz run --- ./target/release-with-debug/${{ env.REPO }}
       - name: Archive profile
         uses: actions/upload-artifact@v2
         with:
           name: profile.coz
-          path: profile.coz
+          path: ./${{ env.REPO }}/profile.coz
           retention-days: 30
   check-fmt-clippy:
     name: Check, Format, Clippy
