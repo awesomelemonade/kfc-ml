@@ -44,14 +44,6 @@ jobs:
         with:
           command: build
           args: --profile=release-with-debug --all-features --manifest-path ./${{ env.REPO }}/Cargo.toml
-      - name: Test
-        run: grep intel_pt /proc/cpuinfo
-      - name: Test 2
-        run: wget https://github.com/janestreet/magic-trace/releases/download/v1.1.0/magic-trace
-      - name: Test 3
-        run: chmod +x magic-trace
-      - name: Test 4
-        run: /magic-trace -help
       - name: Configure for perf
         run: sudo sysctl -w kernel.perf_event_paranoid=1
       - name: Run Coz
