@@ -20,4 +20,4 @@ features = ["auto-initialize"]
 
 [profile.release-with-debug]
 inherits = "release"
-debug = true
+debug = 1
