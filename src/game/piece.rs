@@ -2,7 +2,7 @@ core!();
 use super::*;
 use enum_map::Enum;
 
-#[derive(Debug, Enum, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Enum, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PieceKind {
     Pawn,
     Knight,
