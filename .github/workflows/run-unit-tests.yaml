@@ -26,6 +26,13 @@ jobs:
         with:
           repository: awesomelemonade/ld4-expect
           path: ld4-expect
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      - name: Install Python Dependencies
+        run: pip install -r requirements.txt
       - name: Install Coz
         run: sudo apt install coz-profiler
       - uses: actions-rs/toolchain@v1
@@ -37,8 +44,10 @@ jobs:
         with:
           command: build
           args: --profile=release-with-debug --all-features --manifest-path ./${{ env.REPO }}/Cargo.toml
+      - name: Configure for perf
+        run: sudo sysctl -w kernel.perf_event_paranoid=1
       - name: Run Coz
-        run: sudo coz run --- ./target/release-with-debug/${{ env.REPO }}
+        run: coz run --- ./target/release-with-debug/${{ env.REPO }}
       - name: Archive profile
         uses: actions/upload-artifact@v2
         with:
