@@ -17,8 +17,6 @@ jobs:
       run:
         working-directory: ./${{ env.REPO }}
     steps:
-      - name: Install Coz
-        run: sudo apt install coz-profiler
       - name: Checkout ${{ env.REPO }}
         uses: actions/checkout@v3
         with:
@@ -28,6 +26,8 @@ jobs:
         with:
           repository: awesomelemonade/ld4-expect
           path: ld4-expect
+      - name: Install Coz
+        run: sudo apt install coz-profiler
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal

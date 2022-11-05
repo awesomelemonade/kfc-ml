@@ -371,7 +371,7 @@ impl BoardState {
         let mut moves: Vec<BoardMove> = Vec::new();
         for piece in self.pieces.iter() {
             if piece.side == side {
-                self.add_possible_moves_for_piece(&piece, &mut moves);
+                self.add_possible_moves_for_piece(piece, &mut moves);
             }
         }
         moves
@@ -569,7 +569,7 @@ impl MoveGenerator<'_> {
     }
     fn add_board_move(&mut self, target: Position) {
         self.moves.push(BoardMove::Normal {
-            piece: self.piece.clone(),
+            piece: *self.piece,
             target,
         });
     }
