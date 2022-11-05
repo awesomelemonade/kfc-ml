@@ -3,7 +3,7 @@ core!();
 use super::*;
 use enum_map::EnumMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoardState {
     pieces: Vec<Piece>,
     can_long_castle: EnumMap<Side, bool>,
@@ -11,6 +11,10 @@ pub struct BoardState {
 }
 
 impl BoardState {
+    pub fn pieces(&self) -> &Vec<Piece> {
+        &self.pieces
+    }
+
     fn new_with_castling(pieces: Vec<Piece>, enable_castling: bool) -> Self {
         Self {
             pieces,
@@ -142,7 +146,7 @@ impl BoardState {
             BoardMove::ShortCastle(_side) => false, // TODO: do castling
         }
     }
-    pub fn apply_move(&mut self, board_move: BoardMove) {
+    pub fn apply_move(&mut self, board_move: &BoardMove) {
         match board_move {
             BoardMove::LongCastle(_side) => {
                 // TODO
@@ -154,6 +158,7 @@ impl BoardState {
             }
             BoardMove::ShortCastle(_side) => {}
             BoardMove::Normal { piece, target } => {
+                let target = *target;
                 if let PieceState::Stationary { position, .. } = piece.state {
                     let Position { x, y } = position;
                     let delta = target - position;
@@ -224,7 +229,7 @@ impl BoardState {
         fn intersects((x, y): (f32, f32), (x2, y2): (f32, f32)) -> bool {
             let dx = x - x2;
             let dy = y - y2;
-            dx * dx + dy * dy <= 1f32
+            dx * dx + dy * dy <= 0.95f32
         }
         fn pieces_intersect(a: &Piece, b: &Piece) -> bool {
             // TODO: can be made continuous
@@ -376,6 +381,15 @@ impl BoardState {
         }
         all.join("\n")
     }
+    pub fn to_stationary_map_combo(&self) -> String {
+        self.to_stationary_map('.', |piece| {
+            let c: char = piece.kind.into();
+            match piece.side {
+                Side::White => c.to_ascii_uppercase(),
+                Side::Black => c.to_ascii_lowercase(),
+            }
+        })
+    }
     pub fn to_stationary_map_type(&self) -> String {
         self.to_stationary_map('.', |piece| piece.kind.into())
     }
@@ -416,9 +430,15 @@ impl BoardState {
         }
         Ok(Self::new_with_castling(pieces, false))
     }
+    // TODO: Use ForTest?
+    pub fn is_all_pieces_stationary(&self) -> bool {
+        self.pieces
+            .iter()
+            .all(|piece| matches!(piece.state, PieceState::Stationary { .. }))
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BoardMove {
     LongCastle(Side),
     ShortCastle(Side),
