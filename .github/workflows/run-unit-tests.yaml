@@ -37,6 +37,8 @@ jobs:
         with:
           command: build
           args: --profile=release-with-debug --all-features --manifest-path ./${{ env.REPO }}/Cargo.toml
+      - run: ls kfc-ml
+      - run: ls kfc-ml/target/
       - name: Run Coz
         run: coz run --- ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
       - name: Archive profile
