@@ -350,5 +350,8 @@ fn test_random_state_visualize_queen_move() {
     }).unwrap();
     let moves = RANDOM_BOARD.get_all_possible_moves(Side::White);
     let visualization = visualize_moves_of_piece(queen_position, moves);
-    expect!(visualization, r#""..X.....\nX.X.....\n.XXX....\nXX.XXX..\n.X.X....\n....X...\n.....X..\n......X.""#);
+    expect!(
+        visualization,
+        r#""..X.....\nX.X.....\n.XXX....\nXX.XXX..\n.X.X....\n....X...\n.....X..\n......X.""#
+    );
 }

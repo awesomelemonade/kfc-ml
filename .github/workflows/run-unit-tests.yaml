@@ -10,6 +10,43 @@ name: Run Unit Tests
 env:
   REPO: kfc-ml
 jobs:
+  coz:
+    name: Coz Profiling
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./${{ env.REPO }}
+    steps:
+      - name: Install Coz
+        run: sudo apt install coz-profiler
+      - name: Checkout ${{ env.REPO }}
+        uses: actions/checkout@v3
+        with:
+          path: ${{ env.REPO }}
+      - name: Checkout ld4-expect
+        uses: actions/checkout@v3
+        with:
+          repository: awesomelemonade/ld4-expect
+          path: ld4-expect
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --profile=release-with-debug --all-features
+      - name: Run Coz
+        run: coz run --- ./${{ env.REPO }}/target/release/${{ env.REPO }}
+      - name: ls
+        run: ls
+      - name: Archive profile
+        uses: actions/upload-artifact@v2
+        with:
+          name: profile.coz
+          path: profile.coz
+          retention-days: 30
   check-fmt-clippy:
     name: Check, Format, Clippy
     runs-on: ubuntu-latest

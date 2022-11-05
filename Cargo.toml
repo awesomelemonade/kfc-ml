@@ -1,7 +1,7 @@
 [package]
 name = "kfc-ml"
 version = "0.1.0"
-edition = "2021"
+edition = "2022"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -18,5 +18,6 @@ coz = "0.1"
 version = "0.17.2"
 features = ["auto-initialize"]
 
-[profile.release]
-debug = 1
+[profile.release-with-debug]
+inherits = "release"
+debug = true
