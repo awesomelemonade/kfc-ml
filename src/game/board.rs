@@ -249,8 +249,8 @@ impl BoardState {
             }
         }
         fn can_be_captured(priority: u32, new_position: (f32, f32), capturer: &Piece) -> bool {
-            if priority <= get_priority(capturer) {
-                match capturer.kind {
+            priority <= get_priority(capturer)
+                && match capturer.kind {
                     // if the piece is a knight, it never intersects unless this is the moving knight's target
                     PieceKind::Knight => match capturer.state {
                         PieceState::Stationary { .. } => false,
@@ -261,9 +261,6 @@ impl BoardState {
                     },
                     _ => true,
                 }
-            } else {
-                false
-            }
         }
         // Two moving pieces with the same priority needs to both get captured
         self.pieces = self

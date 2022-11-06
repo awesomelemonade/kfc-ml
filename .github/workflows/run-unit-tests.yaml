@@ -10,8 +10,8 @@ name: Run Unit Tests
 env:
   REPO: kfc-ml
 jobs:
-  coz:
-    name: Coz Profiling
+  flamegraph:
+    name: Flamegraph Profiling
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ${{ env.REPO }}
@@ -47,8 +47,16 @@ jobs:
       - name: Configure for perf
         run: sudo sysctl -w kernel.perf_event_paranoid=1
       - run: sudo sh -c " echo 0 > /proc/sys/kernel/kptr_restrict"
-      - name: Generate flamegraph
-        run: flamegraph -o my_flamegraph.svg -- ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
+      - name: Perf version
+        run: perf --version
+      - run: perf record --call-graph dwarf -o perf.data ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
+      - name: Archive perf
+        uses: actions/upload-artifact@v2
+        with:
+          name: perf.data
+          path: ./perf.data
+          retention-days: 30
+      - run: flamegraph -o my_flamegraph.svg -- ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
       - name: Archive flamegraph
         uses: actions/upload-artifact@v2
         with:
