@@ -13,9 +13,6 @@ jobs:
   coz:
     name: Coz Profiling
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./${{ env.REPO }}
     steps:
       - name: Checkout ${{ env.REPO }}
         uses: actions/checkout@v3
@@ -32,7 +29,7 @@ jobs:
           python-version: '3.10'
           cache: 'pip'
       - name: Install Python Dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r ./${{ env.REPO }}/requirements.txt
       - name: Install Coz
         run: sudo apt install coz-profiler
       - uses: actions-rs/toolchain@v1
@@ -57,13 +54,12 @@ jobs:
       - name: Configure for perf
         run: sudo sysctl -w kernel.perf_event_paranoid=1
       - run: sudo sh -c " echo 0 > /proc/sys/kernel/kptr_restrict"
-      - run: flamegraph -o my_flamegraph.svg -- ./target/release-with-debug/kfc-ml
-        continue-on-error: true
+      - run: flamegraph -o my_flamegraph.svg -- ./${{ env.REPO }}/target/release-with-debug/kfc-ml
       - name: Archive flamegraph
         uses: actions/upload-artifact@v2
         with:
           name: my_flamegraph.svg
-          path: ./${{ env.REPO }}/my_flamegraph.svg
+          path: ./my_flamegraph.svg
           retention-days: 30
   check-fmt-clippy:
     name: Check, Format, Clippy
