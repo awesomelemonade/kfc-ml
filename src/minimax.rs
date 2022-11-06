@@ -14,6 +14,8 @@ lazy_static! {
     };
 }
 
+const MAX_DEPTH: u32 = 2;
+
 pub fn evaluate_material_heuristic(state: &BoardState) -> f32 {
     // count up material
     let material_value: i32 = state
@@ -32,14 +34,8 @@ pub fn evaluate_material_heuristic(state: &BoardState) -> f32 {
 }
 
 pub fn white_move(state: &BoardState, depth: u32) -> (Option<BoardMove>, f32) {
-    if depth >= 2 {
+    if depth >= MAX_DEPTH {
         return (None, evaluate_material_heuristic(state));
-    }
-    if depth == 1 {
-        coz::begin!("white_move_1");
-    }
-    if depth == 0 {
-        coz::begin!("white_move_0");
     }
     let possible_moves = state.get_all_possible_moves(Side::White);
     // if depth <= 1 {
@@ -56,12 +52,6 @@ pub fn white_move(state: &BoardState, depth: u32) -> (Option<BoardMove>, f32) {
         }
     }
     let _x = best_opponent_move;
-    if depth == 0 {
-        coz::end!("white_move_0");
-    }
-    if depth == 1 {
-        coz::end!("white_move_1");
-    }
     (best_move, best_score)
 }
 
@@ -70,7 +60,7 @@ pub fn black_move(
     depth: u32,
     pending_white_move: Option<&BoardMove>,
 ) -> (Option<BoardMove>, f32) {
-    if depth >= 2 {
+    if depth >= MAX_DEPTH {
         return (None, evaluate_material_heuristic(state));
     }
     let possible_moves = state.get_all_possible_moves(Side::Black);
