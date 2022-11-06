@@ -32,8 +32,6 @@ jobs:
         run: pip install -r ./${{ env.REPO }}/requirements.txt
       - name: Update
         run: sudo apt-get update
-      # - name: Install Coz
-      #   run: sudo apt install coz-profiler
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -43,32 +41,14 @@ jobs:
         with:
           command: build
           args: --profile=release-with-debug --all-features --manifest-path ./${{ env.REPO }}/Cargo.toml
-      # - name: Run Coz
-      #   run: ./generate-coz-profile.sh
-      # - name: Archive profile
-      #   uses: actions/upload-artifact@v2
-      #   with:
-      #     name: profile.coz
-      #     path: ./${{ env.REPO }}/profile.coz
-      #     retention-days: 30
       - name: Install perf
         run: sudo apt install linux-tools-common linux-tools-generic linux-tools-`uname -r`
       - run: cargo install flamegraph
       - name: Configure for perf
         run: sudo sysctl -w kernel.perf_event_paranoid=1
       - run: sudo sh -c " echo 0 > /proc/sys/kernel/kptr_restrict"
-      # - run: chmod +x ./kfc-ml/generate-flamegraph.sh
-      # - run: ./kfc-ml/generate-flamegraph.sh
-      - run: perf record --call-graph dwarf -o perf.data ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
-      - name: Archive perf
-        uses: actions/upload-artifact@v2
-        with:
-          name: perf.data
-          path: ./perf.data
-          retention-days: 30
-      # - run: perf script | inferno-collapse-perf > stacks.folded
-      # - run: cat stacks.folded | inferno-flamegraph > flamegraph.svg
-      - run: flamegraph -o my_flamegraph.svg -- ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
+      - name: Generate flamegraph
+        run: flamegraph -o my_flamegraph.svg -- ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
       - name: Archive flamegraph
         uses: actions/upload-artifact@v2
         with:

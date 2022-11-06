@@ -12,7 +12,6 @@ enum-map = "2.4.1"
 lazy_static = "1.4.0"
 ld4-expect = { path = "../ld4-expect" }
 itertools = "0.10.5"
-coz = "0.1"
 rand = "0.8.5"
 
 [dependencies.pyo3]

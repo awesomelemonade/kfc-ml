@@ -368,7 +368,6 @@ impl BoardState {
         moves
     }
     pub fn get_all_possible_moves(&self, side: Side) -> Vec<BoardMove> {
-        coz::scope!("get_all_possible_moves");
         let mut moves: Vec<BoardMove> = Vec::new();
         for piece in self.pieces.iter() {
             if piece.side == side {
