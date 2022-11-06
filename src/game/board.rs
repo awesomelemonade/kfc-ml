@@ -239,16 +239,16 @@ impl BoardState {
             let b3 = position_after_step(&b.state, 1f32);
             intersects(a2, b2) || intersects(a3, b3)
         }
-        fn get_priority(piece: &Piece) -> u32 {
+        fn get_priority(piece: &Piece) -> i32 {
             match piece.state {
-                PieceState::Stationary { .. } => 0u32,
+                PieceState::Stationary { .. } => -1i32,
                 PieceState::Moving {
                     target: MoveTarget { priority, .. },
                     ..
-                } => priority + 1u32,
+                } => priority as i32,
             }
         }
-        fn can_be_captured(priority: u32, new_position: (f32, f32), capturer: &Piece) -> bool {
+        fn can_be_captured(priority: i32, new_position: (f32, f32), capturer: &Piece) -> bool {
             priority <= get_priority(capturer)
                 && match capturer.kind {
                     // if the piece is a knight, it never intersects unless this is the moving knight's target
