@@ -20,10 +20,10 @@ mod minimax;
 use itertools::Itertools;
 use minimax::white_move;
 
-use pyo3::{
-    prelude::*,
-    types::{IntoPyDict, PyModule},
-};
+// use pyo3::{
+//     prelude::*,
+//     types::{IntoPyDict, PyModule},
+// };
 use rand::seq::SliceRandom;
 
 // board.calc_valid_moves_for_piece(PIECE)
@@ -69,7 +69,7 @@ fn get_score(board: &BoardState, white_move: Option<&BoardMove>) -> f32 {
     minimax::evaluate_material_heuristic(&board_mut)
 }
 
-fn main() -> PyResult<()> {
+fn main() {
     let fen_strings = r#"2qn3B/P2k3p/5b1Q/8/8/Pb1r3P/1p5P/4K2R
 6n1/4P1B1/1Npkp1Pp/1Q1q4/8/2r2P2/4RK2/4n3
 r7/4B3/4P1p1/2P1q3/1p3n2/1bPn2PP/6N1/1k3K2
@@ -102,30 +102,31 @@ Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
     // let score = white_move(&board, 0);
     // println!("score={:?}", score);
 
-    Python::with_gil(|py| {
-        let activators = PyModule::from_code(
-            py,
-            r#"
-import numpy as np
+    //     let result = Python::with_gil(|py| {
+    //         let activators = PyModule::from_code(
+    //             py,
+    //             r#"
+    // import numpy as np
 
-def relu(x):
-    return max(0.0, x)
-def leaky_relu(x, slope=0.01):
-    return x if x >= 0 else x * slope
-        "#,
-            "activators.py",
-            "activators",
-        )?;
+    // def relu(x):
+    //     return max(0.0, x)
+    // def leaky_relu(x, slope=0.01):
+    //     return x if x >= 0 else x * slope
+    //         "#,
+    //             "activators.py",
+    //             "activators",
+    //         )?;
 
-        let relu_result: f64 = activators.getattr("relu")?.call1((-1.0,))?.extract()?;
-        assert_eq!(relu_result, 0.0);
+    //         let relu_result: f64 = activators.getattr("relu")?.call1((-1.0,))?.extract()?;
+    //         assert_eq!(relu_result, 0.0);
 
-        let kwargs = [("slope", 0.2)].into_py_dict(py);
-        let lrelu_result: f64 = activators
-            .getattr("leaky_relu")?
-            .call((-1.0,), Some(kwargs))?
-            .extract()?;
-        assert_eq!(lrelu_result, -0.2);
-        Ok(())
-    })
+    //         let kwargs = [("slope", 0.2)].into_py_dict(py);
+    //         let lrelu_result: f64 = activators
+    //             .getattr("leaky_relu")?
+    //             .call((-1.0,), Some(kwargs))?
+    //             .extract()?;
+    //         assert_eq!(lrelu_result, -0.2);
+    //         PyResult::Ok(())
+    //     });
+    //     println!("Result: {:?}", result);
 }
