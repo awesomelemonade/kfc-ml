@@ -249,8 +249,8 @@ impl BoardState {
             }
         }
         fn can_be_captured(priority: u32, new_position: (f32, f32), capturer: &Piece) -> bool {
-            if priority <= get_priority(capturer) {
-                match capturer.kind {
+            priority <= get_priority(capturer)
+                && match capturer.kind {
                     // if the piece is a knight, it never intersects unless this is the moving knight's target
                     PieceKind::Knight => match capturer.state {
                         PieceState::Stationary { .. } => false,
@@ -261,9 +261,6 @@ impl BoardState {
                     },
                     _ => true,
                 }
-            } else {
-                false
-            }
         }
         // Two moving pieces with the same priority needs to both get captured
         self.pieces = self
@@ -340,13 +337,15 @@ impl BoardState {
             })
             .collect();
     }
-    pub fn get_all_possible_moves(&self, side: Side) -> Vec<BoardMove> {
+    pub fn get_all_possible_moves_naive(&self, side: Side) -> Vec<BoardMove> {
         let mut moves: Vec<BoardMove> = Vec::new();
-        // handle castling
+        // Handle castling
         if self.can_long_castle[side] {
+            // TODO: Check cooldown
             moves.push(BoardMove::LongCastle(side));
         }
         if self.can_short_castle[side] {
+            // TODO: Check cooldown
             moves.push(BoardMove::ShortCastle(side));
         }
         for piece in self.pieces.iter().cloned() {
@@ -365,21 +364,91 @@ impl BoardState {
         }
         moves
     }
+    pub fn get_all_possible_moves(&self, side: Side) -> Vec<BoardMove> {
+        let mut moves: Vec<BoardMove> = Vec::new();
+        for piece in self.pieces.iter() {
+            if piece.side == side {
+                self.add_possible_moves_for_piece(piece, &mut moves);
+            }
+        }
+        moves
+    }
+    pub fn add_possible_moves_for_piece(&self, piece: &Piece, moves: &mut Vec<BoardMove>) {
+        if let PieceState::Stationary { position, cooldown } = piece.state && cooldown == 0 {
+            let side = piece.side;
+            let mut generator = MoveGenerator { piece, position, side, moves, board: self };
+            match piece.kind {
+                PieceKind::Pawn => {
+                    let forward_y = forward_y(side);
+                    let double_move_dest = position + (0, forward_y * 2);
+                    let can_double_move = position.y == match side {
+                        Side::White => BOARD_SIZE as u32 - 2,
+                        Side::Black => 1,
+                    } && generator.is_valid_force_no_capture_destination(double_move_dest);
+                    if can_double_move {
+                        generator.add_board_move(double_move_dest);
+                    }
+                    let regular_move_dest = position + (0, forward_y);
+                    let can_regular_move = generator.is_valid_force_no_capture_destination(regular_move_dest);
+                    if can_regular_move {
+                        generator.add_board_move(regular_move_dest);
+                    }
+                    if position.x > 0 {
+                        let neg_x_capture_dest = position + (-1, forward_y);
+                        let can_neg_x_capture = generator.is_valid_force_capture_destination(neg_x_capture_dest);
+                        if can_neg_x_capture {
+                            generator.add_board_move(neg_x_capture_dest);
+                        }
+                    }
+                    if position.x < (BOARD_SIZE - 1) as u32 {
+                        let pos_x_capture_dest = position + (1, forward_y);
+                        let can_pos_x_capture = generator.is_valid_force_capture_destination(pos_x_capture_dest);
+                        if can_pos_x_capture {
+                            generator.add_board_move(pos_x_capture_dest);
+                        }
+                    }
+                },
+                PieceKind::Knight => {
+                    let dx = [-2, -2, 2, 2, -1, -1, 1, 1];
+                    let dy = [-1, 1, -1, 1, -2, 2, -2, 2];
+                    let knights_delta: [Delta; 8] = dx.zip(dy).map(|x| x.into());
+                    generator.add_moves_by_deltas(knights_delta);
+                },
+                PieceKind::Bishop => {
+                    let dx = [-1, -1, 1, 1];
+                    let dy = [-1, 1, -1, 1];
+                    let bishops_delta: [Delta; 4] = dx.zip(dy).map(|x| x.into());
+                    generator.add_moves_by_continuous_deltas(bishops_delta);
+                },
+                PieceKind::Rook => {
+                    let dx = [-1, 1, 0, 0];
+                    let dy = [0, 0, -1, 1];
+                    let rooks_delta: [Delta; 4] = dx.zip(dy).map(|x| x.into());
+                    generator.add_moves_by_continuous_deltas(rooks_delta);
+                },
+                PieceKind::Queen => {
+                    let dx = [-1, -1, 1, 1, -1, 1, 0, 0];
+                    let dy = [-1, 1, -1, 1, 0, 0, -1, 1];
+                    let queens_delta: [Delta; 8] = dx.zip(dy).map(|x| x.into());
+                    generator.add_moves_by_continuous_deltas(queens_delta);
+                },
+                PieceKind::King => {
+                    let dx = [-1, -1, -1, 0, 0, 1, 1, 1];
+                    let dy = [-1, 0, 1, -1, 1, -1, 0, 1];
+                    let kings_delta: [Delta; 8] = dx.zip(dy).map(|x| x.into());
+                    generator.add_moves_by_deltas(kings_delta);
+                },
+            }
+        }
+    }
     pub fn to_stationary_map<F>(&self, default_char: char, f: F) -> String
     where
         F: Fn(&Piece) -> char,
     {
-        let mut all: Vec<String> = Vec::new();
-        for row in 0..BOARD_SIZE {
-            let mut buffer = Vec::new();
-            for col in 0..BOARD_SIZE {
-                let piece = self.get_stationary_piece((col, row).into());
-                let c = piece.map_or(default_char, &f);
-                buffer.push(c);
-            }
-            all.push(buffer.iter().collect());
-        }
-        all.join("\n")
+        to_char_map(|position| {
+            let piece = self.get_stationary_piece(position);
+            piece.map_or(default_char, &f)
+        })
     }
     pub fn to_stationary_map_combo(&self) -> String {
         self.to_stationary_map('.', |piece| {
@@ -443,4 +512,93 @@ pub enum BoardMove {
     LongCastle(Side),
     ShortCastle(Side),
     Normal { piece: Piece, target: Position },
+}
+
+struct MoveGenerator<'a> {
+    piece: &'a Piece,
+    position: Position,
+    side: Side,
+    moves: &'a mut Vec<BoardMove>,
+    board: &'a BoardState,
+}
+
+impl MoveGenerator<'_> {
+    fn try_add(position: Position, Delta { x: dx, y: dy }: Delta) -> Option<Position> {
+        let x = (position.x as i32) + dx;
+        let y = (position.y as i32) + dy;
+        if x >= 0 && y >= 0 && x < BOARD_SIZE as i32 && y < BOARD_SIZE as i32 {
+            Some(Position {
+                x: x as u32,
+                y: y as u32,
+            })
+        } else {
+            None
+        }
+    }
+    fn is_valid_destination(&self, destination: Position) -> bool {
+        // ensures the destination is not some other piece's target
+        // or has an existing stationary piece
+        !self.board.pieces.iter().any(|piece| {
+            if self.side != piece.side {
+                return false;
+            }
+            match piece.state {
+                PieceState::Stationary {
+                    position: piece_position,
+                    ..
+                } => destination == piece_position,
+                PieceState::Moving {
+                    target: MoveTarget { target, .. },
+                    ..
+                } => destination == target,
+            }
+        })
+    }
+    fn is_valid_force_no_capture_destination(&self, destination: Position) -> bool {
+        // used by pawns only
+        self.is_valid_destination(destination)
+            && self.board.get_stationary_piece(destination).is_none()
+    }
+    fn is_valid_force_capture_destination(&self, destination: Position) -> bool {
+        // used by pawns only
+        self.is_valid_destination(destination)
+            && self.board.get_stationary_piece(destination).is_some()
+    }
+    fn add_board_move(&mut self, target: Position) {
+        self.moves.push(BoardMove::Normal {
+            piece: *self.piece,
+            target,
+        });
+    }
+    // knights, kings
+    fn add_moves_by_deltas<const N: usize>(&mut self, deltas: [Delta; N]) {
+        for delta in deltas {
+            let position = Self::try_add(self.position, delta);
+            if let Some(position) = position && self.is_valid_destination(position) {
+                self.add_board_move(position);
+            }
+        }
+    }
+    // bishops, rooks, queens
+    fn add_moves_by_continuous_deltas<const N: usize>(&mut self, deltas: [Delta; N]) {
+        for delta in deltas {
+            let mut current = self.position;
+            while let Some(next) = Self::try_add(current, delta) {
+                current = next;
+                if self.is_valid_destination(current) {
+                    self.add_board_move(current);
+                    // break when it's an enemy
+                    let has_enemy = self
+                        .board
+                        .get_stationary_piece(current)
+                        .map_or(false, |piece| piece.side != self.side);
+                    if has_enemy {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+    }
 }

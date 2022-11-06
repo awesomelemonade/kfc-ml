@@ -4,6 +4,37 @@ use itertools::Itertools;
 
 use super::*;
 
+lazy_static! {
+    pub static ref RANDOM_BOARD: BoardState =
+        BoardState::parse_fen("3N4/b3P3/5p1B/2Q2bPP/PnK5/r5N1/7k/3r4").unwrap();
+}
+
+fn visualize_moves_of_piece(piece_position: Position, moves: Vec<BoardMove>) -> String {
+    let targets = moves
+        .iter()
+        .filter_map(|board_move| {
+            if let BoardMove::Normal {
+                piece: Piece { state, .. },
+                target,
+            } = board_move && let PieceState::Stationary { position, .. } = state
+            {
+                if *position == piece_position {
+                    return Some(target)
+                }
+            }
+            None
+        })
+        .collect_vec();
+    to_char_map(|position| {
+        let is_target = targets.iter().any(|&&target| target == position);
+        if is_target {
+            'X'
+        } else {
+            '.'
+        }
+    })
+}
+
 #[test]
 fn test_forward_y() {
     expect!(forward_y(Side::White), "-1");
@@ -262,9 +293,8 @@ fn test_initial_possible_moves() {
 }
 
 #[test]
-fn test_random_state_possible_moves() {
-    let board = BoardState::parse_fen("3N4/b3P3/5p1B/2Q2bPP/PnK5/r5N1/7k/3r4").unwrap();
-    let moves = board.get_all_possible_moves(Side::White);
+fn test_random_state_possible_moves_naive() {
+    let moves = RANDOM_BOARD.get_all_possible_moves_naive(Side::White);
     let num_moves_per_type = num_moves_per_type(&moves);
     expect!(moves.len(), "38");
     expect!(
@@ -296,5 +326,32 @@ fn test_random_state_possible_moves() {
                 7,
             ),
         ]"#
+    );
+}
+
+#[test]
+fn test_random_state_possible_moves_equivalent_to_naive() {
+    let moves = RANDOM_BOARD.get_all_possible_moves(Side::White);
+    let naive_moves = RANDOM_BOARD.get_all_possible_moves_naive(Side::White);
+    let num_moves = num_moves_per_type(&moves);
+    let num_naive_moves = num_moves_per_type(&naive_moves);
+
+    println!("{}", RANDOM_BOARD.to_stationary_map_combo());
+    assert_eq!(num_moves, num_naive_moves);
+}
+
+#[test]
+fn test_random_state_visualize_queen_move() {
+    let queen_position = RANDOM_BOARD.pieces().iter().find_map(|piece| {
+        if piece.kind == PieceKind::Queen && let PieceState::Stationary { position, .. } = piece.state  {
+            return Some(position);
+        }
+        None
+    }).unwrap();
+    let moves = RANDOM_BOARD.get_all_possible_moves(Side::White);
+    let visualization = visualize_moves_of_piece(queen_position, moves);
+    expect!(
+        visualization,
+        r#""..X.....\nX.X.....\n.XXX....\nXX.XXX..\n.X.X....\n....X...\n.....X..\n......X.""#
     );
 }

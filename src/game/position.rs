@@ -34,7 +34,7 @@ impl Delta {
 }
 
 impl Add<Delta> for Position {
-    type Output = Position;
+    type Output = Position; // TODO-someday: Maybe it's better to do Option<Position>
 
     fn add(self, rhs: Delta) -> Position {
         Position {
@@ -48,6 +48,24 @@ impl AddAssign<Delta> for Position {
     fn add_assign(&mut self, rhs: Delta) {
         self.x = (self.x as i32 + rhs.x) as u32;
         self.y = (self.y as i32 + rhs.y) as u32;
+    }
+}
+
+impl Add<(i32, i32)> for Position {
+    type Output = Position;
+
+    fn add(self, (x, y): (i32, i32)) -> Position {
+        Position {
+            x: (self.x as i32 + x) as u32,
+            y: (self.y as i32 + y) as u32,
+        }
+    }
+}
+
+impl AddAssign<(i32, i32)> for Position {
+    fn add_assign(&mut self, (x, y): (i32, i32)) {
+        self.x = (self.x as i32 + x) as u32;
+        self.y = (self.y as i32 + y) as u32;
     }
 }
 
@@ -79,5 +97,11 @@ impl From<(usize, usize)> for Position {
 impl From<Position> for (f32, f32) {
     fn from(position: Position) -> (f32, f32) {
         (position.x as f32, position.y as f32)
+    }
+}
+
+impl From<(i32, i32)> for Delta {
+    fn from((x, y): (i32, i32)) -> Self {
+        Delta { x, y }
     }
 }
