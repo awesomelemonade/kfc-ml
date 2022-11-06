@@ -46,7 +46,7 @@ use rand::seq::SliceRandom;
 fn get_diff(board: &BoardState) -> f32 {
     let all_moves = board.get_all_possible_moves(Side::White);
     let random_move = all_moves.choose(&mut rand::thread_rng());
-    let (minimax_move, _) = white_move(&board, 0);
+    let (minimax_move, _) = white_move(board, 0);
     let random_score = get_score(board, random_move);
     let minimax_score = get_score(board, minimax_move.as_ref());
     minimax_score - random_score
@@ -83,19 +83,14 @@ q6R/4n3/5K2/4PRB1/1p3Q2/1pP4p/2k1p1p1/7r
 Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
 8/4R1p1/3P1Pb1/Npp5/3P4/5Bk1/1R1pK3/r3N3"#;
     let board_states = fen_strings
-        .split("\n")
+        .split('\n')
         .map(|fen| BoardState::parse_fen(fen).unwrap())
         .collect_vec();
 
-    for _ in 0..10 {
-        let scores = board_states
-            .iter()
-            .map(|board| get_diff(board))
-            .collect_vec();
-        println!("scores={:?}", scores);
-        let average = scores.iter().sum::<f32>() / scores.len() as f32;
-        println!("avg={:?}", average);
-    }
+    let scores = board_states.iter().map(get_diff).collect_vec();
+    println!("scores={:?}", scores);
+    let average = scores.iter().sum::<f32>() / scores.len() as f32;
+    println!("avg={:?}", average);
 
     // let board = BoardState::parse_fen("3N4/b3P3/5p1B/2Q2bPP/PnK5/r5N1/7k/3r4").unwrap();
 

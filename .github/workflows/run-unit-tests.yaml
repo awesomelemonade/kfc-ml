@@ -57,6 +57,7 @@ jobs:
       - run: cargo install flamegraph
       - run: sudo apt install linux-tools-common linux-tools-generic linux-tools-`uname -r`
       - run: sudo ~/.cargo/bin/flamegraph -o my_flamegraph.svg -- ./target/release-with-debug/kfc-ml
+        continue-on-error: true
       - name: Archive flamegraph
         uses: actions/upload-artifact@v2
         with:
