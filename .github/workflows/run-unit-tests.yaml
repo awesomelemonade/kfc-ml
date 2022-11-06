@@ -44,8 +44,6 @@ jobs:
         with:
           command: build
           args: --profile=release-with-debug --all-features --manifest-path ./${{ env.REPO }}/Cargo.toml
-      - name: Configure for perf
-        run: sudo sysctl -w kernel.perf_event_paranoid=1
       # - name: Run Coz
       #   run: ./generate-coz-profile.sh
       # - name: Archive profile
@@ -56,7 +54,10 @@ jobs:
       #     retention-days: 30
       - run: cargo install flamegraph
       - run: sudo apt install linux-tools-common linux-tools-generic linux-tools-`uname -r`
-      - run: sudo ~/.cargo/bin/flamegraph -o my_flamegraph.svg -- ./target/release-with-debug/kfc-ml
+      - name: Configure for perf
+        run: sudo sysctl -w kernel.perf_event_paranoid=1
+      - run: sudo sh -c " echo 0 > /proc/sys/kernel/kptr_restrict"
+      - run: flamegraph -o my_flamegraph.svg -- ./target/release-with-debug/kfc-ml
         continue-on-error: true
       - name: Archive flamegraph
         uses: actions/upload-artifact@v2
