@@ -231,12 +231,23 @@ impl BoardState {
             let dy = y - y2;
             dx * dx + dy * dy <= 0.95f32
         }
-        fn pieces_intersect(a: &Piece, b: &Piece) -> bool {
+        fn piece_will_be_captured(piece: &Piece, capturer: &Piece) -> bool {
+            // // maybe we can short circuit if the pieces are both very far away
+            // match (piece.state, capturer.state) {
+            //     (_, PieceState::Stationary { .. }) => false,
+            //     (
+            //         PieceState::Stationary { position, cooldown },
+            //         PieceState::Moving { x, y, target },
+            //     ) => todo!(),
+            //     (PieceState::Moving { x, y, target }, PieceState::Moving { x, y, target }) => {
+            //         todo!()
+            //     }
+            // }
             // TODO: can be made continuous
-            let a2 = position_after_step(&a.state, 0.5f32);
-            let b2 = position_after_step(&b.state, 0.5f32);
-            let a3 = position_after_step(&a.state, 1f32);
-            let b3 = position_after_step(&b.state, 1f32);
+            let a2 = position_after_step(&piece.state, 0.5f32);
+            let b2 = position_after_step(&capturer.state, 0.5f32);
+            let a3 = position_after_step(&piece.state, 1f32);
+            let b3 = position_after_step(&capturer.state, 1f32);
             intersects(a2, b2) || intersects(a3, b3)
         }
         fn get_priority(piece: &Piece) -> i32 {
@@ -267,13 +278,13 @@ impl BoardState {
             .pieces
             .iter()
             .filter_map(|piece| {
-                let priority = get_priority(piece);
                 let new_position = position_after_step(&piece.state, 1f32);
+                let priority = get_priority(piece);
                 // check if any intersect
                 let intersects = self.pieces.iter().any(|capturer| {
                     piece.side != capturer.side
                         && can_be_captured(priority, new_position, capturer)
-                        && pieces_intersect(piece, capturer)
+                        && piece_will_be_captured(piece, capturer)
                 });
                 if intersects {
                     None
