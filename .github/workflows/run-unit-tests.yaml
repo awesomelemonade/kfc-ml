@@ -54,7 +54,9 @@ jobs:
       - name: Configure for perf
         run: sudo sysctl -w kernel.perf_event_paranoid=1
       - run: sudo sh -c " echo 0 > /proc/sys/kernel/kptr_restrict"
-      - run: flamegraph -o my_flamegraph.svg -- ./${{ env.REPO }}/target/release-with-debug/kfc-ml
+      - run: chmod +x ./kfc-ml/generate-flamegraph.sh
+      - run: ./kfc-ml/generate-flamegraph.sh
+      # - run: flamegraph -o my_flamegraph.svg -- ./${{ env.REPO }}/target/release-with-debug/kfc-ml
       - name: Archive flamegraph
         uses: actions/upload-artifact@v2
         with:
