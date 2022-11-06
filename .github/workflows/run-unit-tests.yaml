@@ -30,8 +30,10 @@ jobs:
           cache: 'pip'
       - name: Install Python Dependencies
         run: pip install -r ./${{ env.REPO }}/requirements.txt
-      - name: Install Coz
-        run: sudo apt install coz-profiler
+      - name: Update
+        run: sudo apt-get update
+      # - name: Install Coz
+      #   run: sudo apt install coz-profiler
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -57,7 +59,7 @@ jobs:
       - run: sudo sh -c " echo 0 > /proc/sys/kernel/kptr_restrict"
       # - run: chmod +x ./kfc-ml/generate-flamegraph.sh
       # - run: ./kfc-ml/generate-flamegraph.sh
-      - run: perf record --call-graph dwarf ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
+      - run: perf record --call-graph dwarf -o perf.data ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
       - name: Archive perf
         uses: actions/upload-artifact@v2
         with:
