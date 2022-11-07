@@ -1,5 +1,7 @@
 core!();
 
+use core::slice;
+
 use super::*;
 use enum_map::EnumMap;
 
@@ -274,55 +276,60 @@ impl BoardState {
                 }
         }
         // Two moving pieces with the same priority needs to both get captured
-        self.pieces = self
-            .pieces
-            .iter()
-            .filter_map(|piece| {
-                let new_position = position_after_step(&piece.state, 1f32);
-                let priority = get_priority(piece);
-                // check if any intersect
-                let intersects = self.pieces.iter().any(|capturer| {
-                    piece.side != capturer.side
-                        && can_be_captured(priority, new_position, capturer)
-                        && piece_will_be_captured(piece, capturer)
-                });
-                if intersects {
-                    None
-                } else {
-                    let new_state = match piece.state {
-                        PieceState::Stationary { position, cooldown } => PieceState::Stationary {
-                            position,
-                            cooldown: cooldown.saturating_sub(1),
-                        },
-                        PieceState::Moving {
-                            target:
-                                MoveTarget {
-                                    target,
-                                    turns_left,
-                                    priority,
-                                },
-                            ..
-                        } => {
-                            if turns_left == 1 {
-                                PieceState::Stationary {
-                                    position: target,
-                                    cooldown: PIECE_COOLDOWN,
-                                }
-                            } else {
-                                let (new_x, new_y) = new_position;
-                                PieceState::Moving {
-                                    x: new_x,
-                                    y: new_y,
-                                    target: MoveTarget {
-                                        target,
-                                        turns_left: turns_left - 1,
-                                        priority: priority + 1,
-                                    },
-                                }
-                            }
-                        }
-                    };
-                    let kind = if let PieceState::Stationary { position, .. } = piece.state {
+        if self.pieces.len() > 20 {
+            println!("PIECE LEN: {}", self.pieces.len());
+        }
+        // TODO: likely not the ideal solution; probably should create Others class and implement IntoIterator
+        type Others<'a, T> = core::iter::Chain<core::slice::Iter<'a, T>, core::slice::Iter<'a, T>>;
+
+        fn retain_mut_with_others<T, F>(v: &mut Vec<T>, mut pred: F)
+        where
+            F: FnMut(&mut T, Others<'_, T>) -> bool,
+        {
+            let mut j = 0;
+            for i in 0..v.len() {
+                let (left, mid, right) = spliti_mut(v, i);
+                let the_rest: Others<'_, T> = left.iter().chain(right.iter());
+                let retain = pred(mid, the_rest);
+                if retain {
+                    v.swap(i, j);
+                    j += 1;
+                }
+            }
+            v.truncate(j);
+        }
+        pub fn spliti_mut<T>(v: &mut Vec<T>, i: usize) -> (&mut [T], &mut T, &mut [T]) {
+            assert!(i < v.len());
+            unsafe { spliti_mut_unchecked(v, i) }
+        }
+        pub unsafe fn spliti_mut_unchecked<T>(
+            v: &mut Vec<T>,
+            i: usize,
+        ) -> (&mut [T], &mut T, &mut [T]) {
+            unsafe {
+                let len = v.len();
+                let ptr = v.as_mut_ptr();
+                let left = slice::from_raw_parts_mut(ptr, i);
+                let mid = &mut *ptr.add(i);
+                let right = slice::from_raw_parts_mut(ptr.add(i + 1), len - i - 1);
+                (left, mid, right)
+            }
+        }
+        retain_mut_with_others(&mut self.pieces, |piece, mut others| {
+            let priority = get_priority(piece);
+            let new_position = position_after_step(&piece.state, 1f32);
+            // check if any intersect
+            // TODO: self.pieces is more like "rest of the pieces"
+            let intersects = others.any(|capturer| {
+                piece.side != capturer.side
+                    && can_be_captured(priority, new_position, capturer)
+                    && piece_will_be_captured(piece, capturer)
+            });
+            if intersects {
+                false
+            } else {
+                match &mut piece.state {
+                    PieceState::Stationary { position, cooldown } => {
                         // check if it's a pawn promotion
                         let is_pawn_promotion = piece.kind == PieceKind::Pawn
                             && position.y
@@ -331,22 +338,36 @@ impl BoardState {
                                     Side::Black => BOARD_SIZE as u32 - 1u32,
                                 };
                         if is_pawn_promotion {
-                            PieceKind::Queen
-                        } else {
-                            piece.kind
+                            piece.kind = PieceKind::Queen;
                         }
-                    } else {
-                        piece.kind
-                    };
-
-                    Some(Piece {
-                        side: piece.side,
-                        kind,
-                        state: new_state,
-                    })
-                }
-            })
-            .collect();
+                        // decrement cooldown
+                        *cooldown = cooldown.saturating_sub(1);
+                    }
+                    PieceState::Moving {
+                        x,
+                        y,
+                        target:
+                            MoveTarget {
+                                target,
+                                turns_left,
+                                priority,
+                            },
+                    } => {
+                        if *turns_left == 1 {
+                            piece.state = PieceState::Stationary {
+                                position: *target,
+                                cooldown: PIECE_COOLDOWN,
+                            }
+                        } else {
+                            (*x, *y) = new_position;
+                            *turns_left -= 1;
+                            *priority += 1;
+                        }
+                    }
+                };
+                true
+            }
+        });
     }
     pub fn get_all_possible_moves_naive(&self, side: Side) -> Vec<BoardMove> {
         let mut moves: Vec<BoardMove> = Vec::new();
