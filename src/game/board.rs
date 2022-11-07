@@ -262,6 +262,10 @@ impl BoardState {
                 ) => {
                     let px = x - position.x as f32;
                     let py = y - position.y as f32;
+                    // optimization: pieces cannot move more than 1 diagonal square
+                    if px * px + py * py >= 1.4143 * 1.4143 {
+                        return false;
+                    }
                     is_within_distance_squared((px, py), velocity)
                 }
                 (
@@ -283,10 +287,15 @@ impl BoardState {
                             },
                     },
                 ) => {
-                    let v_diff_x = vx2 - vx;
-                    let v_diff_y = vy2 - vy;
                     let diff_x = x2 - x;
                     let diff_y = y2 - y;
+                    // optimization: pieces cannot move more than 2 diagonal squares relaltive to another piece
+                    // (2 * sqrt(2)) ^ 2 = 8
+                    if diff_x * diff_x + diff_y * diff_y >= 8f32 {
+                        return false;
+                    }
+                    let v_diff_x = vx2 - vx;
+                    let v_diff_y = vy2 - vy;
                     is_within_distance_squared((diff_x, diff_y), (v_diff_x, v_diff_y))
                 }
             }

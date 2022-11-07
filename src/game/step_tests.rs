@@ -60,7 +60,7 @@ fn test_step_rand_move() {
 }
 
 #[test]
-fn test_step_capture() {
+fn test_step_capture_stationary() {
     let mut board = BoardState::parse_fen("3N4/b3P3/5p1B/2Q2bPP/PnK5/r5N1/7k/3r4").unwrap();
     let queen = board
         .pieces()
@@ -105,3 +105,8 @@ fn test_step_capture() {
         ]"#
     );
 }
+
+// TODO
+// #[test]
+// fn test_step_capture_moving() {
+// }
