@@ -58,3 +58,50 @@ fn test_step_rand_move() {
         ]"#
     );
 }
+
+#[test]
+fn test_step_capture() {
+    let mut board = BoardState::parse_fen("3N4/b3P3/5p1B/2Q2bPP/PnK5/r5N1/7k/3r4").unwrap();
+    let queen = board
+        .pieces()
+        .iter()
+        .find(|piece| piece.side == Side::White && piece.kind == PieceKind::Queen)
+        .unwrap();
+    let board_move = BoardMove::Normal {
+        piece: *queen,
+        target: (5u32, 3u32).into(),
+    };
+    board.apply_move(&board_move);
+    let snapshots = snapshots_until_stationary(&mut board);
+    expect!(
+        board_move,
+        r#"
+        Normal {
+            piece: Piece {
+                side: White,
+                kind: Queen,
+                state: Stationary {
+                    position: Position {
+                        x: 2,
+                        y: 3,
+                    },
+                    cooldown: 0,
+                },
+            },
+            target: Position {
+                x: 5,
+                y: 3,
+            },
+        }"#
+    );
+    expect!(
+        snapshots,
+        r#"
+        [
+            "...N....\nb...P...\n.....p.B\n.....bPP\nPnK.....\nr.....N.\n.......k\n...r....",
+            "...N....\nb...P...\n.....p.B\n.....bPP\nPnK.....\nr.....N.\n.......k\n...r....",
+            "...N....\nb...P...\n.....p.B\n......PP\nPnK.....\nr.....N.\n.......k\n...r....",
+            "...N....\nb...P...\n.....p.B\n.....QPP\nPnK.....\nr.....N.\n.......k\n...r....",
+        ]"#
+    );
+}

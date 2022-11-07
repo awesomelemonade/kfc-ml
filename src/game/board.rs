@@ -164,8 +164,12 @@ impl BoardState {
                 if let PieceState::Stationary { position, .. } = piece.state {
                     let Position { x, y } = position;
                     let delta = target - position;
-                    let target =
-                        MoveTarget::new(target, delta.dist_linf(), MoveTarget::MIN_PRIORITY);
+                    let target = MoveTarget::new(
+                        position,
+                        target,
+                        delta.dist_linf(),
+                        MoveTarget::MIN_PRIORITY,
+                    );
                     // TODO: somehow optimize so we don't have to loop through?
                     if let Some(piece) = self.get_stationary_piece_mut(position) {
                         piece.state = PieceState::Moving {
@@ -210,7 +214,7 @@ impl BoardState {
         })
     }
     pub fn step(&mut self) {
-        fn position_after_step(piece_state: &PieceState, step_size: f32) -> (f32, f32) {
+        fn position_after_step(piece_state: &PieceState) -> (f32, f32) {
             match piece_state {
                 PieceState::Stationary { position, .. } => (position.x as f32, position.y as f32),
                 PieceState::Moving {
@@ -218,39 +222,74 @@ impl BoardState {
                     y,
                     target:
                         MoveTarget {
-                            target, turns_left, ..
+                            velocity: (vx, vy), ..
                         },
-                } => {
-                    let progress = step_size / (*turns_left as f32);
-                    let new_x = (target.x as f32 - x) * progress + x;
-                    let new_y = (target.y as f32 - y) * progress + y;
-                    (new_x, new_y)
-                }
+                } => (x + vx, y + vy),
             }
         }
+        const DISTANCE_THRESHOLD_SQUARED: f32 = 0.95f32 * 0.95f32;
         fn intersects((x, y): (f32, f32), (x2, y2): (f32, f32)) -> bool {
             let dx = x - x2;
             let dy = y - y2;
-            dx * dx + dy * dy <= 0.95f32
+            dx * dx + dy * dy <= DISTANCE_THRESHOLD_SQUARED
         }
         fn piece_will_be_captured(piece: &Piece, capturer: &Piece) -> bool {
-            // // maybe we can short circuit if the pieces are both very far away
-            // match (piece.state, capturer.state) {
-            //     (_, PieceState::Stationary { .. }) => false,
-            //     (
-            //         PieceState::Stationary { position, cooldown },
-            //         PieceState::Moving { x, y, target },
-            //     ) => todo!(),
-            //     (PieceState::Moving { x, y, target }, PieceState::Moving { x, y, target }) => {
-            //         todo!()
-            //     }
-            // }
-            // TODO: can be made continuous
-            let a2 = position_after_step(&piece.state, 0.5f32);
-            let b2 = position_after_step(&capturer.state, 0.5f32);
-            let a3 = position_after_step(&piece.state, 1f32);
-            let b3 = position_after_step(&capturer.state, 1f32);
-            intersects(a2, b2) || intersects(a3, b3)
+            // TODO: maybe we can short circuit if the pieces are both very far away
+            fn is_within_distance_squared(
+                p @ (x, y): (f32, f32),
+                v @ (vx, vy): (f32, f32),
+            ) -> bool {
+                let t = get_t_clamped(p, v);
+                let intersection_x = x + vx * t;
+                let intersection_y = y + vy * t;
+                intersection_x * intersection_x + intersection_y * intersection_y
+                    <= DISTANCE_THRESHOLD_SQUARED
+            }
+            fn get_t_clamped((x, y): (f32, f32), (vx, vy): (f32, f32)) -> f32 {
+                // at what t will p + v * t be closest to (0, 0)?
+                // t = (-px * vx - py * vy) / (vx^2 + vy^2)
+                ((-x * vx - y * vy) / (vx * vx + vy * vy)).clamp(0f32, 1f32)
+            }
+            match (piece.state, capturer.state) {
+                (_, PieceState::Stationary { .. }) => false,
+                (
+                    PieceState::Stationary { position, .. },
+                    PieceState::Moving {
+                        x,
+                        y,
+                        target: MoveTarget { velocity, .. },
+                    },
+                ) => {
+                    let px = x - position.x as f32;
+                    let py = y - position.y as f32;
+                    is_within_distance_squared((px, py), velocity)
+                }
+                (
+                    PieceState::Moving {
+                        x,
+                        y,
+                        target:
+                            MoveTarget {
+                                velocity: (vx, vy), ..
+                            },
+                    },
+                    PieceState::Moving {
+                        x: x2,
+                        y: y2,
+                        target:
+                            MoveTarget {
+                                velocity: (vx2, vy2),
+                                ..
+                            },
+                    },
+                ) => {
+                    let v_diff_x = vx2 - vx;
+                    let v_diff_y = vy2 - vy;
+                    let diff_x = x2 - x;
+                    let diff_y = y2 - y;
+                    is_within_distance_squared((diff_x, diff_y), (v_diff_x, v_diff_y))
+                }
+            }
         }
         fn get_priority(piece: &Piece) -> i32 {
             match piece.state {
@@ -317,7 +356,7 @@ impl BoardState {
         }
         retain_mut_with_others(&mut self.pieces, |piece, mut others| {
             let priority = get_priority(piece);
-            let new_position = position_after_step(&piece.state, 1f32);
+            let new_position = position_after_step(&piece.state);
             // check if any intersect
             // TODO: self.pieces is more like "rest of the pieces"
             let intersects = others.any(|capturer| {
@@ -351,6 +390,7 @@ impl BoardState {
                                 target,
                                 turns_left,
                                 priority,
+                                ..
                             },
                     } => {
                         if *turns_left == 1 {

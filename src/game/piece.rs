@@ -58,21 +58,25 @@ pub enum PieceState {
     Moving { x: f32, y: f32, target: MoveTarget },
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct MoveTarget {
     pub target: Position, // Stationary Position
     pub turns_left: u32,  // number of turns left to arrive at the target
     // piece that moves first gets precedence (and eats opposing pieces in its path - the path is blocked off for its own pieces for the duration of its move)
     pub priority: u32, // priority gets incremented at every step
+    pub velocity: (f32, f32),
 }
 
 impl MoveTarget {
     pub const MIN_PRIORITY: u32 = 0;
-    pub fn new(target: Position, turns_left: u32, priority: u32) -> Self {
+    pub fn new(current: Position, target: Position, turns_left: u32, priority: u32) -> Self {
+        let vx = ((target.x - current.x) as f32) / (turns_left as f32);
+        let vy = ((target.y - current.y) as f32) / (turns_left as f32);
         Self {
             target,
             turns_left,
             priority,
+            velocity: (vx, vy),
         }
     }
 }
