@@ -46,7 +46,13 @@ use rand::seq::SliceRandom;
 fn get_diff(board: &BoardState) -> f32 {
     let all_moves = board.get_all_possible_moves(Side::White);
     let random_move = all_moves.choose(&mut rand::thread_rng());
-    let (minimax_move, _) = white_move(board, 0);
+    unsafe {
+        minimax::NUM_LEAVES = 0;
+    }
+    let (minimax_move, _) = white_move(board, 0, f32::NEG_INFINITY, f32::INFINITY);
+    unsafe {
+        println!("NUM_LEAVES={}", minimax::NUM_LEAVES);
+    }
     let random_score = get_score(board, random_move);
     let minimax_score = get_score(board, minimax_move.as_ref());
     minimax_score - random_score
