@@ -1,7 +1,10 @@
+core!();
+
 use super::*;
 use enum_map::{enum_map, EnumMap};
 
-core!();
+#[cfg(test)]
+mod minimax_tests;
 
 lazy_static! {
     pub static ref MATERIAL_VALUE: EnumMap<PieceKind, u32> = enum_map! {
@@ -13,8 +16,6 @@ lazy_static! {
         PieceKind::King => 100,
     };
 }
-
-const MAX_DEPTH: u32 = 2;
 
 type HeuristicScore = f32;
 
@@ -40,10 +41,25 @@ pub fn evaluate_material_heuristic(state: &BoardState) -> HeuristicScore {
     material_value as f32
 }
 
-pub struct MinimaxOutput {
-    pub best_move: Option<BoardMove>,
-    pub best_score: HeuristicScore,
-    pub next: Option<Box<MinimaxOutput>>,
+#[derive(Debug, Clone)]
+pub enum MinimaxOutput {
+    Node {
+        best_move: Option<BoardMove>,
+        best_score: HeuristicScore,
+        next: Box<MinimaxOutput>,
+    },
+    Leaf {
+        score: HeuristicScore,
+    },
+}
+
+impl MinimaxOutput {
+    pub fn score(&self) -> HeuristicScore {
+        match self {
+            MinimaxOutput::Node { best_score, .. } => *best_score,
+            MinimaxOutput::Leaf { score } => *score,
+        }
+    }
 }
 
 pub fn white_move(
@@ -52,24 +68,20 @@ pub fn white_move(
     mut alpha: HeuristicScore,
     beta: HeuristicScore,
 ) -> MinimaxOutput {
-    if depth >= MAX_DEPTH {
+    if depth == 0 {
         let score = evaluate_material_heuristic(state);
-        return MinimaxOutput {
-            best_move: None,
-            best_score: score,
-            next: None,
-        };
+        return MinimaxOutput::Leaf { score };
     }
     let mut best_move = Option::None;
     let mut best_opponent_move = black_move(state, depth, alpha, beta, None);
-    let mut best_score = best_opponent_move.best_score;
+    let mut best_score = best_opponent_move.score();
     alpha = alpha.max(best_score);
     if best_score < beta {
         let possible_moves = state.get_all_possible_moves(Side::White);
         // TODO: reorder possible_moves
         for board_move in possible_moves {
             let opponent_move = black_move(state, depth, alpha, beta, Some(&board_move));
-            let score = opponent_move.best_score;
+            let score = opponent_move.score();
             if score > best_score {
                 best_score = score;
                 best_move = Some(board_move);
@@ -81,10 +93,10 @@ pub fn white_move(
             }
         }
     }
-    MinimaxOutput {
+    MinimaxOutput::Node {
         best_move,
         best_score,
-        next: Some(Box::new(best_opponent_move)),
+        next: Box::new(best_opponent_move),
     }
 }
 
@@ -95,13 +107,9 @@ pub fn black_move(
     mut beta: HeuristicScore,
     pending_white_move: Option<&BoardMove>,
 ) -> MinimaxOutput {
-    if depth >= MAX_DEPTH {
+    if depth == 0 {
         let score = evaluate_material_heuristic(state);
-        return MinimaxOutput {
-            best_move: None,
-            best_score: score,
-            next: None,
-        };
+        return MinimaxOutput::Leaf { score };
     }
     let mut best_move = Option::None;
     let mut new_state_no_move = state.clone();
@@ -109,8 +117,8 @@ pub fn black_move(
         new_state_no_move.apply_move(pending_white_move);
     }
     new_state_no_move.step();
-    let mut best_opponent_move = white_move(&new_state_no_move, depth + 1, alpha, beta);
-    let mut best_score = best_opponent_move.best_score;
+    let mut best_opponent_move = white_move(&new_state_no_move, depth - 1, alpha, beta);
+    let mut best_score = best_opponent_move.score();
     beta = beta.min(best_score);
     if best_score > alpha {
         let possible_moves = state.get_all_possible_moves(Side::Black);
@@ -122,8 +130,8 @@ pub fn black_move(
             }
             new_state.apply_move(&board_move);
             new_state.step();
-            let opponent_move = white_move(&new_state, depth + 1, alpha, beta);
-            let score = opponent_move.best_score;
+            let opponent_move = white_move(&new_state, depth - 1, alpha, beta);
+            let score = opponent_move.score();
             if score < best_score {
                 best_score = score;
                 best_move = Some(board_move);
@@ -135,9 +143,9 @@ pub fn black_move(
             }
         }
     }
-    MinimaxOutput {
+    MinimaxOutput::Node {
         best_move,
         best_score,
-        next: Some(Box::new(best_opponent_move)),
+        next: Box::new(best_opponent_move),
     }
 }
