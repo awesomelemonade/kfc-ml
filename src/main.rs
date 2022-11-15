@@ -49,12 +49,12 @@ fn get_diff(board: &BoardState) -> f32 {
     unsafe {
         minimax::NUM_LEAVES = 0;
     }
-    let (minimax_move, _) = white_move(board, 0, f32::NEG_INFINITY, f32::INFINITY);
+    let minimax_move = white_move(board, 0, f32::NEG_INFINITY, f32::INFINITY);
     unsafe {
         println!("NUM_LEAVES={}", minimax::NUM_LEAVES);
     }
     let random_score = get_score(board, random_move);
-    let minimax_score = get_score(board, minimax_move.as_ref());
+    let minimax_score = get_score(board, minimax_move.best_move.as_ref());
     minimax_score - random_score
 }
 
