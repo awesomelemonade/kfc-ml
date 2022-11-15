@@ -13,6 +13,9 @@ pub use position::*;
 mod board_util;
 pub use board_util::*;
 
+mod pieces;
+pub use pieces::*;
+
 #[cfg(test)]
 mod tests;
 
