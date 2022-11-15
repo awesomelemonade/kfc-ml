@@ -70,8 +70,8 @@ pub struct MoveTarget {
 impl MoveTarget {
     pub const MIN_PRIORITY: u32 = 0;
     pub fn new(current: Position, target: Position, turns_left: u32, priority: u32) -> Self {
-        let vx = ((target.x - current.x) as f32) / (turns_left as f32);
-        let vy = ((target.y - current.y) as f32) / (turns_left as f32);
+        let vx = ((target.x as f32) - (current.x as f32)) / (turns_left as f32);
+        let vy = ((target.y as f32) - (current.y as f32)) / (turns_left as f32);
         Self {
             target,
             turns_left,

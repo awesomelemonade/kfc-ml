@@ -9,7 +9,7 @@ lazy_static! {
         PieceKind::Knight => 3,
         PieceKind::Bishop => 3,
         PieceKind::Rook => 5,
-        PieceKind::Queen => 8,
+        PieceKind::Queen => 9,
         PieceKind::King => 100,
     };
 }
