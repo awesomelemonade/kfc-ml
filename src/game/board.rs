@@ -5,21 +5,23 @@ use core::slice;
 use super::*;
 use enum_map::EnumMap;
 
+const MAX_PIECES: usize = 32;
+
 #[derive(Debug, Clone)]
 pub struct BoardState {
-    pieces: Vec<Piece>,
+    pieces: Pieces<MAX_PIECES>,
     can_long_castle: EnumMap<Side, bool>,
     can_short_castle: EnumMap<Side, bool>,
 }
 
 impl BoardState {
-    pub fn pieces(&self) -> &Vec<Piece> {
+    pub fn pieces(&self) -> &Pieces<MAX_PIECES> {
         &self.pieces
     }
 
-    fn new_with_castling(pieces: Vec<Piece>, enable_castling: bool) -> Self {
-        Self {
-            pieces,
+    fn new_with_castling(pieces: Vec<Piece>, enable_castling: bool) -> Result<Self, Vec<Piece>> {
+        Ok(Self {
+            pieces: pieces.try_into()?,
             can_long_castle: enum_map! {
                 Side::White => enable_castling,
                 Side::Black => enable_castling,
@@ -28,7 +30,7 @@ impl BoardState {
                 Side::White => enable_castling,
                 Side::Black => enable_castling,
             },
-        }
+        })
     }
 
     pub fn new_initial_state() -> Self {
@@ -52,7 +54,7 @@ impl BoardState {
         append_pieces(&mut pieces, Side::White, &INITIAL_WHITE_PIECES);
         append_pieces(&mut pieces, Side::Black, &INITIAL_BLACK_PIECES);
         // TODO: Support Castling
-        Self::new_with_castling(pieces, false)
+        Self::new_with_castling(pieces, false).unwrap()
     }
     pub fn can_move(&self, board_move: &BoardMove) -> bool {
         fn get_positions_between(start: Position, end: Position) -> Vec<Position> {
@@ -330,21 +332,21 @@ impl BoardState {
         // TODO: likely not the ideal solution; probably should create Others class and implement IntoIterator
         type Others<'a, T> = core::iter::Chain<core::slice::Iter<'a, T>, core::slice::Iter<'a, T>>;
 
-        fn retain_mut_with_others<T, F>(v: &mut Vec<T>, mut pred: F)
+        fn retain_mut_with_others<T, F, const N: usize>(_pieces: &mut Pieces<N>, mut _pred: F)
         where
             F: FnMut(&mut T, Others<'_, T>) -> bool,
         {
-            let mut j = 0;
-            for i in 0..v.len() {
-                let (left, mid, right) = spliti_mut(v, i);
-                let the_rest: Others<'_, T> = left.iter().chain(right.iter());
-                let retain = pred(mid, the_rest);
-                if retain {
-                    v.swap(i, j);
-                    j += 1;
-                }
-            }
-            v.truncate(j);
+            // let mut j = 0;
+            // for i in 0..v.len() {
+            //     let (left, mid, right) = spliti_mut(v, i);
+            //     let the_rest: Others<'_, T> = left.iter().chain(right.iter());
+            //     let retain = pred(mid, the_rest);
+            //     if retain {
+            //         v.swap(i, j);
+            //         j += 1;
+            //     }
+            // }
+            // v.truncate(j);
         }
         pub fn spliti_mut<T>(v: &mut Vec<T>, i: usize) -> (&mut [T], &mut T, &mut [T]) {
             assert!(i < v.len());
@@ -578,7 +580,9 @@ impl BoardState {
                 }
             }
         }
-        Ok(Self::new_with_castling(pieces, false))
+        let board = Self::new_with_castling(pieces, false)
+            .map_err(|e| Error!("Failed to parse: {:?}", e))?;
+        Ok(board)
     }
     // TODO: Use ForTest?
     pub fn is_all_pieces_stationary(&self) -> bool {
