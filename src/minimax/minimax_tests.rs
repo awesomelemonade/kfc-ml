@@ -97,7 +97,6 @@ fn test_moves() {
             Ok((score, num_leaves, moves))
         })
         .collect();
-
     expect!(
         board_moves,
         r#"
@@ -105,7 +104,7 @@ fn test_moves() {
             [
                 (
                     -11.0,
-                    59183,
+                    91584,
                     [
                         "side=White, kind=Bishop, move=[7, 0] -> [5, 2]",
                         "side=Black, kind=Pawn, move=[7, 1] -> [7, 3]",
@@ -115,7 +114,7 @@ fn test_moves() {
                 ),
                 (
                     7.0,
-                    1418,
+                    8138,
                     [
                         "side=White, kind=Pawn, move=[4, 1] -> [4, 0]",
                         "side=Black, kind=Knight, move=[6, 0] -> [4, 1]",
@@ -125,7 +124,7 @@ fn test_moves() {
                 ),
                 (
                     -13.0,
-                    40656,
+                    72153,
                     [
                         "side=White, kind=Pawn, move=[2, 5] -> [1, 4]",
                         "side=Black, kind=Knight, move=[5, 4] -> [6, 6]",
@@ -135,7 +134,7 @@ fn test_moves() {
                 ),
                 (
                     27.0,
-                    1056,
+                    5333,
                     [
                         "side=White, kind=Pawn, move=[1, 1] -> [1, 0]",
                         "side=Black, kind=Bishop, move=[5, 2] -> [3, 4]",
@@ -145,7 +144,7 @@ fn test_moves() {
                 ),
                 (
                     -2.0,
-                    146212,
+                    210656,
                     [
                         "side=White, kind=King, move=[5, 2] -> [4, 1]",
                         "side=Black, kind=Pawn, move=[4, 6] -> [4, 7]",
@@ -155,7 +154,7 @@ fn test_moves() {
                 ),
                 (
                     3.0,
-                    2435,
+                    15276,
                     [
                         "side=White, kind=Pawn, move=[1, 1] -> [1, 0]",
                         "side=Black, kind=Pawn, move=[4, 6] -> [4, 7]",
@@ -165,7 +164,7 @@ fn test_moves() {
                 ),
                 (
                     -9.0,
-                    28220,
+                    40240,
                     [
                         "side=White, kind=Rook, move=[2, 3] -> [4, 3]",
                         "side=Black, kind=Bishop, move=[7, 5] -> [5, 3]",
@@ -175,7 +174,7 @@ fn test_moves() {
                 ),
                 (
                     5.0,
-                    643,
+                    4959,
                     [
                         "None",
                         "None",
@@ -185,7 +184,7 @@ fn test_moves() {
                 ),
                 (
                     -19.0,
-                    1455,
+                    24372,
                     [
                         "side=White, kind=Bishop, move=[6, 2] -> [4, 4]",
                         "side=Black, kind=Pawn, move=[2, 6] -> [2, 7]",
@@ -195,7 +194,7 @@ fn test_moves() {
                 ),
                 (
                     -6.0,
-                    39418,
+                    66049,
                     [
                         "side=White, kind=Bishop, move=[3, 1] -> [0, 4]",
                         "side=Black, kind=Bishop, move=[0, 3] -> [1, 2]",
@@ -205,7 +204,7 @@ fn test_moves() {
                 ),
                 (
                     3.0,
-                    5435,
+                    16425,
                     [
                         "side=White, kind=Queen, move=[0, 0] -> [1, 1]",
                         "side=Black, kind=Queen, move=[1, 1] -> [2, 2]",
@@ -215,7 +214,7 @@ fn test_moves() {
                 ),
                 (
                     9.0,
-                    16600,
+                    40354,
                     [
                         "side=White, kind=Bishop, move=[5, 5] -> [7, 7]",
                         "side=Black, kind=Bishop, move=[6, 2] -> [5, 1]",

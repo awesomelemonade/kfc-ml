@@ -19,12 +19,7 @@ lazy_static! {
 
 type HeuristicScore = f32;
 
-pub static mut NUM_LEAVES: usize = 0;
-
 pub fn evaluate_material_heuristic(state: &BoardState) -> HeuristicScore {
-    unsafe {
-        NUM_LEAVES += 1;
-    }
     // count up material
     let material_value: i32 = state
         .pieces()
@@ -80,9 +75,9 @@ pub fn white_move(
         let score = evaluate_material_heuristic(state);
         return MinimaxOutput::Leaf { score };
     }
-    let mut num_leaves = 0;
     let mut best_move = Option::None;
     let mut best_opponent_move = black_move(state, depth, alpha, beta, None);
+    let mut num_leaves = best_opponent_move.num_leaves();
     let mut best_score = best_opponent_move.score();
     alpha = alpha.max(best_score);
     if best_score < beta {
@@ -122,7 +117,6 @@ pub fn black_move(
         let score = evaluate_material_heuristic(state);
         return MinimaxOutput::Leaf { score };
     }
-    let mut num_leaves = 0;
     let mut best_move = Option::None;
     let mut new_state_no_move = state.clone();
     if let Some(pending_white_move) = pending_white_move {
@@ -130,6 +124,7 @@ pub fn black_move(
     }
     new_state_no_move.step();
     let mut best_opponent_move = white_move(&new_state_no_move, depth - 1, alpha, beta);
+    let mut num_leaves = best_opponent_move.num_leaves();
     let mut best_score = best_opponent_move.score();
     beta = beta.min(best_score);
     if best_score > alpha {
