@@ -17,9 +17,9 @@ mod game;
 pub use game::*;
 
 mod minimax;
+pub use minimax::*;
+
 use itertools::Itertools;
-use minimax::white_move;
-use minimax::MinimaxOutput;
 
 // use pyo3::{
 //     prelude::*,

@@ -1,6 +1,6 @@
 core!();
 
-use super::*;
+use crate::*;
 use enum_map::{enum_map, EnumMap};
 
 #[cfg(test)]
@@ -46,6 +46,7 @@ pub enum MinimaxOutput {
     Node {
         best_move: Option<BoardMove>,
         best_score: HeuristicScore,
+        num_leaves: u32,
         next: Box<MinimaxOutput>,
     },
     Leaf {
@@ -60,6 +61,13 @@ impl MinimaxOutput {
             MinimaxOutput::Leaf { score } => *score,
         }
     }
+
+    pub fn num_leaves(&self) -> u32 {
+        match self {
+            MinimaxOutput::Node { num_leaves, .. } => *num_leaves,
+            MinimaxOutput::Leaf { .. } => 1,
+        }
+    }
 }
 
 pub fn white_move(
@@ -72,6 +80,7 @@ pub fn white_move(
         let score = evaluate_material_heuristic(state);
         return MinimaxOutput::Leaf { score };
     }
+    let mut num_leaves = 0;
     let mut best_move = Option::None;
     let mut best_opponent_move = black_move(state, depth, alpha, beta, None);
     let mut best_score = best_opponent_move.score();
@@ -81,6 +90,7 @@ pub fn white_move(
         // TODO: reorder possible_moves
         for board_move in possible_moves {
             let opponent_move = black_move(state, depth, alpha, beta, Some(&board_move));
+            num_leaves += opponent_move.num_leaves();
             let score = opponent_move.score();
             if score > best_score {
                 best_score = score;
@@ -96,6 +106,7 @@ pub fn white_move(
     MinimaxOutput::Node {
         best_move,
         best_score,
+        num_leaves,
         next: Box::new(best_opponent_move),
     }
 }
@@ -111,6 +122,7 @@ pub fn black_move(
         let score = evaluate_material_heuristic(state);
         return MinimaxOutput::Leaf { score };
     }
+    let mut num_leaves = 0;
     let mut best_move = Option::None;
     let mut new_state_no_move = state.clone();
     if let Some(pending_white_move) = pending_white_move {
@@ -131,6 +143,7 @@ pub fn black_move(
             new_state.apply_move(&board_move);
             new_state.step();
             let opponent_move = white_move(&new_state, depth - 1, alpha, beta);
+            num_leaves += opponent_move.num_leaves();
             let score = opponent_move.score();
             if score < best_score {
                 best_score = score;
@@ -146,6 +159,7 @@ pub fn black_move(
     MinimaxOutput::Node {
         best_move,
         best_score,
+        num_leaves,
         next: Box::new(best_opponent_move),
     }
 }
