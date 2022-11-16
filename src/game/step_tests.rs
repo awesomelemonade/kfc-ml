@@ -119,10 +119,30 @@ fn test_step_capture_stationary() {
     );
 }
 
-// TODO
-// #[test]
-// fn test_step_capture_moving() {
-// }
+#[test]
+fn test_step_capture_moving() {
+    let mut board = BoardState::parse_fen("8/8/8/8/8/8/8/R6r").unwrap();
+    let white_target: Position = (7u32, 7u32).into();
+    let black_target: Position = (0u32, 7u32).into();
+    let white_moves = board.get_all_possible_moves(Side::White);
+    let white_move = white_moves
+        .iter()
+        .find(|m| matches!(m, BoardMove::Normal { target, .. } if target == &white_target))
+        .unwrap();
+    let black_moves = board.get_all_possible_moves(Side::Black);
+    let black_move = black_moves
+        .iter()
+        .find(|m| matches!(m, BoardMove::Normal { target, .. } if target == &black_target))
+        .unwrap();
+    board.apply_move(white_move);
+    board.step();
+    board.apply_move(black_move);
+    board.step_n(15);
+    expect!(
+        board.to_stationary_map_combo(),
+        r#""........\n........\n........\n........\n........\n........\n........\n.......R""#
+    );
+}
 
 #[test]
 fn test_cooldown() {
@@ -164,7 +184,9 @@ fn test_no_move_while_cooldown() {
     expect!(possible_moves, "[]");
     board.step_n(10);
     let possible_moves = board.get_all_possible_moves(Side::White);
-    expect!(possible_moves, r#"
+    expect!(
+        possible_moves,
+        r#"
         [
             Normal {
                 piece: Piece {
@@ -183,5 +205,6 @@ fn test_no_move_while_cooldown() {
                     y: 2,
                 },
             },
-        ]"#);
+        ]"#
+    );
 }
