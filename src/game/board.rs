@@ -213,6 +213,11 @@ impl BoardState {
             } => side == piece.side && position == target,
         })
     }
+    pub fn step_n(&mut self, n: u32) {
+        for _ in 0..n {
+            self.step();
+        }
+    }
     pub fn step(&mut self) {
         fn position_after_step(piece_state: &PieceState) -> (f32, f32) {
             match piece_state {
@@ -529,6 +534,19 @@ impl BoardState {
         to_char_map(|position| {
             let piece = self.get_stationary_piece(position);
             piece.map_or(default_char, &f)
+        })
+    }
+    pub fn to_stationary_map_cooldowns(&self) -> String {
+        self.to_stationary_map('.', |piece| {
+            if let PieceState::Stationary { cooldown, .. } = piece.state {
+                if cooldown == 10 {
+                    'X'
+                } else {
+                    cooldown.to_string().chars().next().unwrap()
+                }
+            } else {
+                '?'
+            }
         })
     }
     pub fn to_stationary_map_combo(&self) -> String {

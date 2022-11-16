@@ -20,6 +20,10 @@ lazy_static! {
 type HeuristicScore = f32;
 
 pub fn evaluate_material_heuristic(state: &BoardState) -> HeuristicScore {
+    let mut state = state.clone();
+    while !state.is_all_pieces_stationary() {
+        state.step();
+    }
     // count up material
     let material_value: i32 = state
         .pieces()

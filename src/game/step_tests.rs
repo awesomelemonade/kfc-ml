@@ -2,6 +2,19 @@ core!();
 
 use super::*;
 
+fn snapshots_n<F>(board: &mut BoardState, n: u32, f: F) -> Vec<String>
+where
+    F: Fn(&BoardState) -> String,
+{
+    let mut all_steps = Vec::new();
+    for _ in 0..n {
+        all_steps.push(f(board));
+        board.step();
+    }
+    all_steps.push(f(board));
+    all_steps
+}
+
 fn snapshots_until_stationary(board: &mut BoardState) -> Vec<String> {
     let mut all_steps = Vec::new();
     while !board.is_all_pieces_stationary() {
@@ -110,3 +123,65 @@ fn test_step_capture_stationary() {
 // #[test]
 // fn test_step_capture_moving() {
 // }
+
+#[test]
+fn test_cooldown() {
+    let mut board = BoardState::parse_fen("8/8/8/8/4P3/8/8/8").unwrap();
+    let board_move = board.get_all_possible_moves(Side::White).pop().unwrap();
+    board.apply_move(&board_move);
+    let snapshots = snapshots_n(&mut board, 15, |x| x.to_stationary_map_cooldowns());
+    expect!(
+        snapshots,
+        r#"
+        [
+            "........\n........\n........\n........\n........\n........\n........\n........",
+            "........\n........\n........\n....X...\n........\n........\n........\n........",
+            "........\n........\n........\n....9...\n........\n........\n........\n........",
+            "........\n........\n........\n....8...\n........\n........\n........\n........",
+            "........\n........\n........\n....7...\n........\n........\n........\n........",
+            "........\n........\n........\n....6...\n........\n........\n........\n........",
+            "........\n........\n........\n....5...\n........\n........\n........\n........",
+            "........\n........\n........\n....4...\n........\n........\n........\n........",
+            "........\n........\n........\n....3...\n........\n........\n........\n........",
+            "........\n........\n........\n....2...\n........\n........\n........\n........",
+            "........\n........\n........\n....1...\n........\n........\n........\n........",
+            "........\n........\n........\n....0...\n........\n........\n........\n........",
+            "........\n........\n........\n....0...\n........\n........\n........\n........",
+            "........\n........\n........\n....0...\n........\n........\n........\n........",
+            "........\n........\n........\n....0...\n........\n........\n........\n........",
+            "........\n........\n........\n....0...\n........\n........\n........\n........",
+        ]"#
+    );
+}
+
+#[test]
+fn test_no_move_while_cooldown() {
+    let mut board = BoardState::parse_fen("8/8/8/8/4P3/8/8/8").unwrap();
+    let board_move = board.get_all_possible_moves(Side::White).pop().unwrap();
+    board.apply_move(&board_move);
+    board.step_n(5);
+    let possible_moves = board.get_all_possible_moves(Side::White);
+    expect!(possible_moves, "[]");
+    board.step_n(10);
+    let possible_moves = board.get_all_possible_moves(Side::White);
+    expect!(possible_moves, r#"
+        [
+            Normal {
+                piece: Piece {
+                    side: White,
+                    kind: Pawn,
+                    state: Stationary {
+                        position: Position {
+                            x: 4,
+                            y: 3,
+                        },
+                        cooldown: 0,
+                    },
+                },
+                target: Position {
+                    x: 4,
+                    y: 2,
+                },
+            },
+        ]"#);
+}
