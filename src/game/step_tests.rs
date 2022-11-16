@@ -113,7 +113,7 @@ fn test_step_capture_stationary() {
         [
             "...N....\nb...P...\n.....p.B\n.....bPP\nPnK.....\nr.....N.\n.......k\n...r....",
             "...N....\nb...P...\n.....p.B\n.....bPP\nPnK.....\nr.....N.\n.......k\n...r....",
-            "...N....\nb...P...\n.....p.B\n......PP\nPnK.....\nr.....N.\n.......k\n...r....",
+            "...N....\nb...P...\n.....p.B\n.....bPP\nPnK.....\nr.....N.\n.......k\n...r....",
             "...N....\nb...P...\n.....p.B\n.....QPP\nPnK.....\nr.....N.\n.......k\n...r....",
         ]"#
     );
@@ -206,5 +206,38 @@ fn test_no_move_while_cooldown() {
                 },
             },
         ]"#
+    );
+}
+
+#[test]
+fn test_pawn_promotion() {
+    let mut board = BoardState::parse_fen("8/P7/8/8/8/8/8/8").unwrap();
+    let board_move = board.get_all_possible_moves(Side::White).pop().unwrap();
+    expect!(
+        &board_move,
+        r#"
+        Normal {
+            piece: Piece {
+                side: White,
+                kind: Pawn,
+                state: Stationary {
+                    position: Position {
+                        x: 0,
+                        y: 1,
+                    },
+                    cooldown: 0,
+                },
+            },
+            target: Position {
+                x: 0,
+                y: 0,
+            },
+        }"#
+    );
+    board.apply_move(&board_move);
+    board.step();
+    expect!(
+        board.to_stationary_map_combo(),
+        r#""Q.......\n........\n........\n........\n........\n........\n........\n........""#
     );
 }

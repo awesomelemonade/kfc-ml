@@ -328,10 +328,6 @@ impl BoardState {
                     _ => true,
                 }
         }
-        // Two moving pieces with the same priority needs to both get captured
-        if self.pieces.len() > 20 {
-            println!("PIECE LEN: {}", self.pieces.len());
-        }
         // TODO: likely not the ideal solution; probably should create Others class and implement IntoIterator
         type Others<'a, T> = core::iter::Chain<core::slice::Iter<'a, T>, core::slice::Iter<'a, T>>;
 
@@ -372,20 +368,34 @@ impl BoardState {
             let priority = get_priority(piece);
             let new_position = position_after_step(&piece.state);
             // check if any intersect
-            // TODO: self.pieces is more like "rest of the pieces"
             let intersects = others.any(|capturer| {
                 piece.side != capturer.side
                     && can_be_captured(priority, new_position, capturer)
                     && piece_will_be_captured(piece, capturer)
             });
-            if intersects {
-                false
-            } else {
-                match &mut piece.state {
-                    PieceState::Stationary { position, cooldown } => {
+            !intersects
+        });
+        for piece in &mut self.pieces {
+            match &mut piece.state {
+                PieceState::Stationary { cooldown, .. } => {
+                    // decrement cooldown
+                    *cooldown = cooldown.saturating_sub(1);
+                }
+                PieceState::Moving {
+                    x,
+                    y,
+                    target:
+                        MoveTarget {
+                            target,
+                            turns_left,
+                            priority,
+                            velocity: (vx, vy),
+                        },
+                } => {
+                    if *turns_left == 1 {
                         // check if it's a pawn promotion
                         let is_pawn_promotion = piece.kind == PieceKind::Pawn
-                            && position.y
+                            && target.y
                                 == match piece.side {
                                     Side::White => 0u32,
                                     Side::Black => BOARD_SIZE as u32 - 1u32,
@@ -393,35 +403,19 @@ impl BoardState {
                         if is_pawn_promotion {
                             piece.kind = PieceKind::Queen;
                         }
-                        // decrement cooldown
-                        *cooldown = cooldown.saturating_sub(1);
-                    }
-                    PieceState::Moving {
-                        x,
-                        y,
-                        target:
-                            MoveTarget {
-                                target,
-                                turns_left,
-                                priority,
-                                ..
-                            },
-                    } => {
-                        if *turns_left == 1 {
-                            piece.state = PieceState::Stationary {
-                                position: *target,
-                                cooldown: PIECE_COOLDOWN,
-                            }
-                        } else {
-                            (*x, *y) = new_position;
-                            *turns_left -= 1;
-                            *priority += 1;
+                        piece.state = PieceState::Stationary {
+                            position: *target,
+                            cooldown: PIECE_COOLDOWN,
                         }
+                    } else {
+                        *x += *vx;
+                        *y += *vy;
+                        *turns_left -= 1;
+                        *priority += 1;
                     }
-                };
-                true
-            }
-        });
+                }
+            };
+        }
     }
     pub fn get_all_possible_moves_naive(&self, side: Side) -> Vec<BoardMove> {
         let mut moves: Vec<BoardMove> = Vec::new();
