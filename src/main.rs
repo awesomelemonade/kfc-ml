@@ -44,7 +44,7 @@ use rand::seq::SliceRandom;
 //     // king -> 1 slot
 // }
 
-const SEARCH_DEPTH: u32 = 3;
+const SEARCH_DEPTH: u32 = 2;
 
 fn get_diff(board: &BoardState) -> f32 {
     let all_moves = board.get_all_possible_moves(Side::White);
