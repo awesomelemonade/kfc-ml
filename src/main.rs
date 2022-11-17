@@ -1,6 +1,7 @@
 #![feature(const_for)]
 #![feature(let_chains)]
 #![feature(array_zip)]
+#![feature(variant_count)]
 
 macro_rules! core {
     () => {
@@ -19,6 +20,9 @@ pub use game::*;
 mod minimax;
 pub use minimax::*;
 
+mod board_representation;
+pub use board_representation::*;
+
 use itertools::Itertools;
 
 // use pyo3::{
@@ -26,23 +30,6 @@ use itertools::Itertools;
 //     types::{IntoPyDict, PyModule},
 // };
 use rand::seq::SliceRandom;
-
-// board.calc_valid_moves_for_piece(PIECE)
-// board.calc_valid_moves()
-// board.calc_valid_next_states() # next states for combination moves
-// board.calc_valid_next_states_one_move() # next states for one move
-// board.step(moves) // Also resolves collisions
-
-// As input to an ML model - impl from board?
-// struct BoardRepresentation {
-//     // for each side
-//     // pawn -> 8 slots
-//     // rook -> 2 slots
-//     // knight -> 2 slots
-//     // bishop -> 2 slots
-//     // queen -> 2 slots // extra slot for queens for promotion
-//     // king -> 1 slot
-// }
 
 const SEARCH_DEPTH: u32 = 2;
 
