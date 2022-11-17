@@ -10,6 +10,59 @@ name: Run Unit Tests
 env:
   REPO: kfc-ml
 jobs:
+  flamegraph:
+    name: Flamegraph Profiling
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ${{ env.REPO }}
+        uses: actions/checkout@v3
+        with:
+          path: ${{ env.REPO }}
+      - name: Checkout ld4-expect
+        uses: actions/checkout@v3
+        with:
+          repository: awesomelemonade/ld4-expect
+          path: ld4-expect
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      - name: Install Python Dependencies
+        run: pip install -r ./${{ env.REPO }}/requirements.txt
+      - name: Update
+        run: sudo apt-get update
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --profile=release-with-debug --all-features --manifest-path ./${{ env.REPO }}/Cargo.toml
+      - name: Install perf
+        run: sudo apt install linux-tools-common linux-tools-generic linux-tools-`uname -r`
+      - run: cargo install flamegraph
+      - name: Configure for perf
+        run: sudo sysctl -w kernel.perf_event_paranoid=1
+      - run: sudo sh -c " echo 0 > /proc/sys/kernel/kptr_restrict"
+      - name: Perf version
+        run: perf --version
+      - run: perf record --call-graph dwarf -o perf.data ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
+      - name: Archive perf
+        uses: actions/upload-artifact@v2
+        with:
+          name: perf.data
+          path: ./perf.data
+          retention-days: 30
+      - run: flamegraph -o my_flamegraph.svg -- ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
+      - name: Archive flamegraph
+        uses: actions/upload-artifact@v2
+        with:
+          name: my_flamegraph.svg
+          path: ./my_flamegraph.svg
+          retention-days: 30
   check-fmt-clippy:
     name: Check, Format, Clippy
     runs-on: ubuntu-latest

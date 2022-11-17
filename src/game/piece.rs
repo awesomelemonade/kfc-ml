@@ -1,7 +1,8 @@
 core!();
-use enum_map::{Enum};
+use super::*;
+use enum_map::Enum;
 
-#[derive(Debug, Enum, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Enum, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PieceKind {
     Pawn,
     Knight,
@@ -11,23 +12,71 @@ pub enum PieceKind {
     King,
 }
 
+impl PieceKind {
+    pub fn from_char(value: char) -> Option<PieceKind> {
+        match value {
+            'P' => Some(PieceKind::Pawn),
+            'N' => Some(PieceKind::Knight),
+            'B' => Some(PieceKind::Bishop),
+            'R' => Some(PieceKind::Rook),
+            'Q' => Some(PieceKind::Queen),
+            'K' => Some(PieceKind::King),
+            _ => None,
+        }
+    }
+}
+
+impl From<PieceKind> for char {
+    fn from(kind: PieceKind) -> Self {
+        match kind {
+            PieceKind::Pawn => 'P',
+            PieceKind::Knight => 'N',
+            PieceKind::Bishop => 'B',
+            PieceKind::Rook => 'R',
+            PieceKind::Queen => 'Q',
+            PieceKind::King => 'K',
+        }
+    }
+}
+
 #[derive(Debug, Enum, Copy, Clone, PartialEq, Eq)]
 pub enum Side {
     White,
     Black,
 }
 
-pub type Position = (f32, f32);
-
-pub struct MoveTarget {
-    pub target: Position,
-    pub turns_left: u32,
-    // piece that moves first gets precedence (and eats opposing pieces in its path - the path is blocked off for its own pieces for the duration of its move)
-    pub priority: u32, // priority gets incremented at every step
-}
+#[derive(Debug, Copy, Clone)]
 pub struct Piece {
     pub side: Side,
     pub kind: PieceKind,
-    pub position: Position,
-    pub moving_target: Option<MoveTarget>, // None means the piece is not moving
+    pub state: PieceState,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum PieceState {
+    Stationary { position: Position, cooldown: u32 },
+    Moving { x: f32, y: f32, target: MoveTarget },
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct MoveTarget {
+    pub target: Position, // Stationary Position
+    pub turns_left: u32,  // number of turns left to arrive at the target
+    // piece that moves first gets precedence (and eats opposing pieces in its path - the path is blocked off for its own pieces for the duration of its move)
+    pub priority: u32, // priority gets incremented at every step
+    pub velocity: (f32, f32),
+}
+
+impl MoveTarget {
+    pub const MIN_PRIORITY: u32 = 0;
+    pub fn new(current: Position, target: Position, turns_left: u32, priority: u32) -> Self {
+        let vx = ((target.x as f32) - (current.x as f32)) / (turns_left as f32);
+        let vy = ((target.y as f32) - (current.y as f32)) / (turns_left as f32);
+        Self {
+            target,
+            turns_left,
+            priority,
+            velocity: (vx, vy),
+        }
+    }
 }
