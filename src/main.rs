@@ -17,8 +17,9 @@ mod game;
 pub use game::*;
 
 mod minimax;
+pub use minimax::*;
+
 use itertools::Itertools;
-use minimax::white_move;
 
 // use pyo3::{
 //     prelude::*,
@@ -43,10 +44,16 @@ use rand::seq::SliceRandom;
 //     // king -> 1 slot
 // }
 
+const SEARCH_DEPTH: u32 = 2;
+
 fn get_diff(board: &BoardState) -> f32 {
     let all_moves = board.get_all_possible_moves(Side::White);
     let random_move = all_moves.choose(&mut rand::thread_rng());
-    let (minimax_move, _) = white_move(board, 0);
+    let minimax_output = white_move(board, SEARCH_DEPTH, f32::NEG_INFINITY, f32::INFINITY);
+    let minimax_move = match minimax_output {
+        MinimaxOutput::Node { best_move, .. } => best_move,
+        MinimaxOutput::Leaf { .. } => None,
+    };
     let random_score = get_score(board, random_move);
     let minimax_score = get_score(board, minimax_move.as_ref());
     minimax_score - random_score

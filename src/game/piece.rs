@@ -45,6 +45,15 @@ pub enum Side {
     Black,
 }
 
+impl From<Side> for char {
+    fn from(side: Side) -> Self {
+        match side {
+            Side::White => 'W',
+            Side::Black => 'B',
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Piece {
     pub side: Side,
