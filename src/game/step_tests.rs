@@ -182,7 +182,14 @@ fn test_no_move_while_cooldown() {
     board.step_n(5);
     let possible_moves = board.get_all_possible_moves(Side::White);
     expect!(possible_moves, "[]");
-    board.step_n(10);
+}
+
+#[test]
+fn test_has_move_after_cooldown() {
+    let mut board = BoardState::parse_fen("8/8/8/8/4P3/8/8/8").unwrap();
+    let board_move = board.get_all_possible_moves(Side::White).pop().unwrap();
+    board.apply_move(&board_move);
+    board.step_n(15);
     let possible_moves = board.get_all_possible_moves(Side::White);
     expect!(
         possible_moves,
