@@ -4,6 +4,10 @@ use enum_map::Enum;
 
 use crate::*;
 
+#[cfg(test)]
+mod board_representation_tests;
+
+#[derive(Debug)]
 struct BoardRepresentation {
     white: BoardRepresentationSide,
     black: BoardRepresentationSide,
@@ -16,11 +20,35 @@ impl BoardRepresentation {
             black: BoardRepresentationSide::new(),
         }
     }
+
     fn get_side_mut(&mut self, side: Side) -> &mut BoardRepresentationSide {
         match side {
             Side::White => &mut self.white,
             Side::Black => &mut self.black,
         }
+    }
+
+    const fn num_floats() -> usize {
+        BoardRepresentationSide::num_floats() * 2
+    }
+
+    pub fn to_float_array(&self) -> [f32; BoardRepresentation::num_floats()] {
+        const N: usize = BoardRepresentation::num_floats();
+        let mut array = [0f32; N];
+        let mut i = 0;
+        for pieces in self.white.all_arrays() {
+            for piece in pieces {
+                piece.write_floats(&mut array[i..]);
+                i += BoardRepresentationPiece::num_floats();
+            }
+        }
+        for pieces in self.black.all_arrays() {
+            for piece in pieces {
+                piece.write_floats(&mut array[i..]);
+                i += BoardRepresentationPiece::num_floats();
+            }
+        }
+        array
     }
 }
 
@@ -70,6 +98,7 @@ impl Default for PieceCounter {
     }
 }
 
+#[derive(Debug)]
 struct BoardRepresentationSide {
     // pawn -> 8 slots
     // knight -> 2 slots
@@ -110,6 +139,26 @@ impl BoardRepresentationSide {
             king: [BoardRepresentationPiece::Missing; 1],
         }
     }
+    const fn all_arrays(&self) -> [&[BoardRepresentationPiece]; 6] {
+        [
+            &self.pawns,
+            &self.knights,
+            &self.bishops,
+            &self.rooks,
+            &self.queens,
+            &self.king,
+        ]
+    }
+
+    // TODO-someday: we want to create a #[derive(FloatSerializable)] ??
+    const fn num_floats() -> usize {
+        BoardRepresentationSide::num_pieces() * BoardRepresentationPiece::num_floats()
+    }
+
+    const fn num_pieces() -> usize {
+        const NUM_PIECES_PER_SIDE: usize = 8 + 2 + 2 + 2 + 2 + 1;
+        NUM_PIECES_PER_SIDE
+    }
 }
 
 impl Default for BoardRepresentationSide {
@@ -120,7 +169,7 @@ impl Default for BoardRepresentationSide {
 
 #[derive(Debug, Clone, Copy)]
 enum BoardRepresentationPiece {
-    Stationary { x: f32, y: f32, cooldown: u8 },
+    Stationary { x: f32, y: f32, cooldown: f32 },
     Moving { x: f32, y: f32 },
     Missing,
 }
@@ -131,9 +180,37 @@ impl From<PieceState> for BoardRepresentationPiece {
             PieceState::Stationary { position, cooldown } => BoardRepresentationPiece::Stationary {
                 x: position.x as f32,
                 y: position.y as f32,
-                cooldown: cooldown as u8,
+                cooldown: cooldown as f32,
             },
             PieceState::Moving { x, y, .. } => BoardRepresentationPiece::Moving { x, y },
         }
+    }
+}
+
+impl BoardRepresentationPiece {
+    fn write_floats(&self, array: &mut [f32]) {
+        match self {
+            BoardRepresentationPiece::Missing => {
+                array[0] = 0f32;
+                array[1] = 0f32;
+                array[2] = 0f32;
+                array[3] = 0f32;
+            }
+            BoardRepresentationPiece::Stationary { x, y, cooldown } => {
+                array[0] = 1f32;
+                array[1] = *x;
+                array[2] = *y;
+                array[3] = *cooldown;
+            }
+            BoardRepresentationPiece::Moving { x, y } => {
+                array[0] = 2f32;
+                array[1] = *x;
+                array[2] = *y;
+                array[3] = 10f32; // moving pieces will have big cooldown
+            }
+        }
+    }
+    const fn num_floats() -> usize {
+        4
     }
 }
