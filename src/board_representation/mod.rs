@@ -8,7 +8,7 @@ use crate::*;
 mod board_representation_tests;
 
 #[derive(Debug)]
-struct BoardRepresentation {
+pub struct BoardRepresentation {
     white: BoardRepresentationSide,
     black: BoardRepresentationSide,
 }
@@ -58,8 +58,8 @@ impl Default for BoardRepresentation {
     }
 }
 
-impl From<BoardState> for BoardRepresentation {
-    fn from(state: BoardState) -> Self {
+impl From<&BoardState> for BoardRepresentation {
+    fn from(state: &BoardState) -> Self {
         let mut board = BoardRepresentation::new();
         let mut counter = PieceCounter::new();
         for piece in state.pieces() {

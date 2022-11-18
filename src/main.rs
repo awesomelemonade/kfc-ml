@@ -80,6 +80,14 @@ Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
         .split('\n')
         .map(|fen| BoardState::parse_fen(fen).unwrap())
         .collect_vec();
+    let floats = board_states
+        .iter()
+        .map(|state| {
+            let representation: BoardRepresentation = state.into();
+            representation.to_float_array()
+        })
+        .collect_vec(); // TODO: map to numpy array
+    println!("{:?}", floats);
 
     let scores = board_states.iter().map(get_diff).collect_vec();
     println!("scores={:?}", scores);

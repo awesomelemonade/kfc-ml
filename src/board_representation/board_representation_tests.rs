@@ -6,7 +6,9 @@ use super::*;
 fn test_initial_board() {
     let board = BoardState::new_initial_state();
     let representation: BoardRepresentation = board.into();
-    expect!(representation.to_float_array(), r#"
+    expect!(
+        representation.to_float_array(),
+        r#"
         [
             1.0,
             0.0,
@@ -144,7 +146,8 @@ fn test_initial_board() {
             4.0,
             0.0,
             0.0,
-        ]"#);
+        ]"#
+    );
     expect!(
         representation,
         r#"
