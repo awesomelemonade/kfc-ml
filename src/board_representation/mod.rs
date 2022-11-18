@@ -57,6 +57,11 @@ impl Default for BoardRepresentation {
         Self::new()
     }
 }
+impl From<BoardState> for BoardRepresentation {
+    fn from(state: BoardState) -> Self {
+        BoardRepresentation::from(&state)
+    }
+}
 
 impl From<&BoardState> for BoardRepresentation {
     fn from(state: &BoardState) -> Self {
@@ -117,7 +122,9 @@ struct BoardRepresentationSide {
 impl BoardRepresentationSide {
     fn insert_piece(&mut self, kind: PieceKind, position: usize, piece: BoardRepresentationPiece) {
         let array = self.get_array_mut(kind);
-        array[position] = piece;
+        if position < array.len() {
+            array[position] = piece;
+        }
     }
     fn get_array_mut(&mut self, kind: PieceKind) -> &mut [BoardRepresentationPiece] {
         match kind {
