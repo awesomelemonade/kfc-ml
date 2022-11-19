@@ -2,6 +2,9 @@
 #![feature(let_chains)]
 #![feature(array_zip)]
 
+use numpy::PyArray;
+use pyo3::{types::IntoPyDict, PyResult, Python, prelude::*};
+
 macro_rules! core {
     () => {
         #[allow(unused_imports)]
@@ -70,6 +73,7 @@ fn get_score(board: &BoardState, white_move: Option<&BoardMove>) -> f32 {
 }
 
 fn main() {
+    /*
     let fen_strings = r#"2qn3B/P2k3p/5b1Q/8/8/Pb1r3P/1p5P/4K2R
 6n1/4P1B1/1Npkp1Pp/1Q1q4/8/2r2P2/4RK2/4n3
 r7/4B3/4P1p1/2P1q3/1p3n2/1bPn2PP/6N1/1k3K2
@@ -91,6 +95,50 @@ Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
     println!("scores={:?}", scores);
     let average = scores.iter().sum::<f32>() / scores.len() as f32;
     println!("avg={:?}", average);
+    */
+
+    let x = vec![-1, -2, -3, 4, 5, 6, 7, 8, 9, 10];
+    let py_test = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/model/pytest.py"));
+    println!("{:?}", x);
+
+    let from_python: PyResult<String> = Python::with_gil(|py| {
+        let np = py.import("numpy")?;
+        let locals = [("np", np)].into_py_dict(py);
+
+        let module = PyModule::from_code(py, py_test, "model.pytest", "model.pytest")?;
+
+
+        let gil = pyo3::Python::acquire_gil();
+        let pyarray = PyArray::from_vec(gil.python(), x);
+
+        
+        /* // Make function call
+        let funct = module.getattr("test123")?;
+        let result = funct.call1((pyarray,))?;
+        */
+
+        // let instance = module.getattr("test")?;
+        // let result = instance.call_method1("testfunction", (pyarray,))?;
+        println!("result={:?}", result);
+        Ok(String::from(result.extract::<&str>()?))
+    });
+
+    /*
+    Python::with_gil(|py| {
+        let np = py.import("numpy")?;
+        let locals = [("np", np)].into_py_dict(py);
+
+        let gil = pyo3::Python::acquire_gil();
+        let pyarray = PyArray::from_vec(gil.python(), x);
+
+
+        let readonly = pyarray.readonly();
+        let slice = readonly.as_slice()?;
+        assert_eq!(slice, &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+        Ok(())
+    })
+    */
 
     // let board = BoardState::parse_fen("3N4/b3P3/5p1B/2Q2bPP/PnK5/r5N1/7k/3r4").unwrap();
 
