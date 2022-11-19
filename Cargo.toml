@@ -23,3 +23,6 @@ features = ["auto-initialize"]
 [profile.release-with-debug]
 inherits = "release"
 debug = 1
+
+[profile.test]
+opt-level = 3

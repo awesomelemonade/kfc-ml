@@ -1,6 +1,7 @@
 #![feature(const_for)]
 #![feature(let_chains)]
 #![feature(array_zip)]
+#![feature(variant_count)]
 
 use numpy::PyArray;
 use pyo3::{types::IntoPyDict, PyResult, Python, prelude::*};
@@ -20,8 +21,12 @@ mod game;
 pub use game::*;
 
 mod minimax;
+pub use minimax::*;
+
+mod board_representation;
+pub use board_representation::*;
+
 use itertools::Itertools;
-use minimax::white_move;
 
 // use pyo3::{
 //     prelude::*,
@@ -29,27 +34,16 @@ use minimax::white_move;
 // };
 use rand::seq::SliceRandom;
 
-// board.calc_valid_moves_for_piece(PIECE)
-// board.calc_valid_moves()
-// board.calc_valid_next_states() # next states for combination moves
-// board.calc_valid_next_states_one_move() # next states for one move
-// board.step(moves) // Also resolves collisions
-
-// As input to an ML model - impl from board?
-// struct BoardRepresentation {
-//     // for each side
-//     // pawn -> 8 slots
-//     // rook -> 2 slots
-//     // knight -> 2 slots
-//     // bishop -> 2 slots
-//     // queen -> 2 slots // extra slot for queens for promotion
-//     // king -> 1 slot
-// }
+const SEARCH_DEPTH: u32 = 2;
 
 fn get_diff(board: &BoardState) -> f32 {
     let all_moves = board.get_all_possible_moves(Side::White);
     let random_move = all_moves.choose(&mut rand::thread_rng());
-    let (minimax_move, _) = white_move(board, 0);
+    let minimax_output = white_move(board, SEARCH_DEPTH, f32::NEG_INFINITY, f32::INFINITY);
+    let minimax_move = match minimax_output {
+        MinimaxOutput::Node { best_move, .. } => best_move,
+        MinimaxOutput::Leaf { .. } => None,
+    };
     let random_score = get_score(board, random_move);
     let minimax_score = get_score(board, minimax_move.as_ref());
     minimax_score - random_score
@@ -90,6 +84,14 @@ Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
         .split('\n')
         .map(|fen| BoardState::parse_fen(fen).unwrap())
         .collect_vec();
+    let floats = board_states
+        .iter()
+        .map(|state| {
+            let representation: BoardRepresentation = state.into();
+            representation.to_float_array()
+        })
+        .collect_vec(); // TODO: map to numpy array
+    println!("{:?}", floats);
 
     let scores = board_states.iter().map(get_diff).collect_vec();
     println!("scores={:?}", scores);
