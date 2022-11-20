@@ -184,6 +184,7 @@ impl BoardState {
         }
     }
     fn get_stationary_piece(&self, position: Position) -> Option<&Piece> {
+        // TODO-someday: Return some stationary piece type instead of just piece?
         self.pieces.iter().find(|piece| match piece.state {
             PieceState::Stationary {
                 position: piece_position,
@@ -444,10 +445,65 @@ impl BoardState {
         }
         moves
     }
+    pub fn get_sorted_quiescent_moves(&self, side: Side) -> Vec<BoardMove> {
+        // TODO: sorted by some priority score???
+
+        // prioritize captures by computing value of victim - attacker
+        // then prioritize getting out of the way - maybe by distance? shorter distance is better?
+        // then search None?
+
+        // only if capturing move AND they can't get away
+        // OR if this piece is a target
+        let mut moves: Vec<BoardMove> = Vec::new();
+        for piece in self.pieces.iter() {
+            // TODO-someday: should be looping through stationary pieces and filter by side
+            if piece.side == side {
+                if let PieceState::Stationary { position, .. } = piece.state && self.is_target_of_capture(&position) {
+                    self.add_possible_moves_for_piece(piece, &mut moves);
+                } else {
+                    let mut piece_moves = Vec::new();
+                    self.add_possible_moves_for_piece(piece, &mut piece_moves);
+                    for board_move in piece_moves {
+                        if self.is_force_capture_move(&board_move) {
+                            moves.push(board_move);
+                        }
+                    }
+                }
+            }
+        }
+        moves
+    }
+    fn is_force_capture_move(&self, board_move: &BoardMove) -> bool {
+        if let BoardMove::Normal { piece, target } = board_move &&
+            let PieceState::Stationary { position, .. } = piece.state &&
+            let Some(target_piece) = self.get_stationary_piece(*target) &&
+            let PieceState::Stationary {position: target_position, cooldown: target_cooldown} = target_piece.state {
+            let delta = target_position - position;
+            let transit_time = delta.dist_linf();
+            transit_time <= target_cooldown
+        } else {
+            false
+        }
+    }
+    // TODO: Optimizable across multiple calls
+    fn is_target_of_capture(&self, position: &Position) -> bool {
+        self.pieces.iter().any(|piece| {
+            if let PieceState::Moving {
+                target: MoveTarget { target, .. },
+                ..
+            } = piece.state
+            {
+                &target == position
+            } else {
+                false
+            }
+        })
+    }
     pub fn get_all_possible_moves(&self, side: Side) -> Vec<BoardMove> {
         let mut moves: Vec<BoardMove> = Vec::new();
         for piece in self.pieces.iter() {
             if piece.side == side {
+                // TODO-someday: should be looping through stationary pieces and filter by side
                 self.add_possible_moves_for_piece(piece, &mut moves);
             }
         }
@@ -604,7 +660,7 @@ impl BoardState {
 pub enum BoardMove {
     LongCastle(Side),
     ShortCastle(Side),
-    Normal { piece: Piece, target: Position },
+    Normal { piece: Piece, target: Position }, // TODO-someday: PieceState should always be stationary here - represent this differently?
 }
 
 struct MoveGenerator<'a> {
