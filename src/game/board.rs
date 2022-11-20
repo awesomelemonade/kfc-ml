@@ -4,6 +4,7 @@ use core::slice;
 
 use super::*;
 use enum_map::EnumMap;
+use itertools::Itertools;
 
 #[derive(Debug, Clone)]
 pub struct BoardState {
@@ -446,7 +447,7 @@ impl BoardState {
         moves
     }
     pub fn get_sorted_quiescent_moves(&self, side: Side) -> Vec<BoardMove> {
-        // TODO: sorted by some priority score???
+        // TODO: search promotion moves?
 
         // prioritize captures by computing value of victim - attacker
         // then prioritize getting out of the way - maybe by distance? shorter distance is better?
@@ -454,24 +455,33 @@ impl BoardState {
 
         // only if capturing move AND they can't get away
         // OR if this piece is a target
-        let mut moves: Vec<BoardMove> = Vec::new();
+        let mut capture_moves: Vec<(BoardMove, i32)> = Vec::new();
+        let mut out_of_capture_moves: Vec<BoardMove> = Vec::new();
         for piece in self.pieces.iter() {
             // TODO-someday: should be looping through stationary pieces and filter by side
             if piece.side == side {
                 if let PieceState::Stationary { position, .. } = piece.state && self.is_target_of_capture(&position) {
-                    self.add_possible_moves_for_piece(piece, &mut moves);
+                    self.add_possible_moves_for_piece(piece, &mut out_of_capture_moves);
                 } else {
                     let mut piece_moves = Vec::new();
                     self.add_possible_moves_for_piece(piece, &mut piece_moves);
                     for board_move in piece_moves {
                         if self.is_force_capture_move(&board_move) {
-                            moves.push(board_move);
+                            let priority = 0;
+                            capture_moves.push((board_move, priority));
                         }
                     }
                 }
             }
         }
-        moves
+
+        let mut all_moves = capture_moves
+            .iter()
+            .sorted_by_key(|(_board_move, priority)| priority)
+            .map(|(board_move, _priority)| board_move.clone()) // TODO-someday: likely an unnecessary clone, but might be compiled out
+            .collect_vec();
+        all_moves.append(&mut out_of_capture_moves);
+        all_moves
     }
     fn is_force_capture_move(&self, board_move: &BoardMove) -> bool {
         if let BoardMove::Normal { piece, target } = board_move &&
