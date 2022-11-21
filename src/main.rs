@@ -37,6 +37,8 @@ fn get_diff(board: &BoardState) -> f32 {
     let all_moves = board.get_all_possible_moves(Side::White);
     let random_move = all_moves.choose(&mut rand::thread_rng());
     let minimax_output = white_move(board, SEARCH_DEPTH, f32::NEG_INFINITY, f32::INFINITY);
+    let num_leaves = minimax_output.num_leaves();
+    println!("NUM LEAVES: {}", num_leaves); // TODO: remove
     let minimax_move = match minimax_output {
         MinimaxOutput::Node { best_move, .. } => best_move,
         MinimaxOutput::Leaf { .. } => None,

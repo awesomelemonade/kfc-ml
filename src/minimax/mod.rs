@@ -75,7 +75,7 @@ pub fn white_move(
     mut alpha: HeuristicScore,
     beta: HeuristicScore,
 ) -> MinimaxOutput {
-    if depth == 0 {
+    if state.is_all_pieces_stationary_with_no_cooldown() && depth == 0 {
         let score = evaluate_material_heuristic(state);
         return MinimaxOutput::Leaf { score };
     }
@@ -85,8 +85,12 @@ pub fn white_move(
     let mut best_score = best_opponent_move.score();
     alpha = alpha.max(best_score);
     if best_score < beta {
-        let possible_moves = state.get_all_possible_moves(Side::White);
-        // TODO: reorder possible_moves
+        let possible_moves = if depth == 0 {
+            state.get_sorted_quiescent_moves(Side::White, |kind| MATERIAL_VALUE[kind] as i32)
+        } else {
+            state.get_all_possible_moves(Side::White)
+            // TODO: reorder possible_moves
+        };
         for board_move in possible_moves {
             let opponent_move = black_move(state, depth, alpha, beta, Some(&board_move));
             num_leaves += opponent_move.num_leaves();
@@ -117,7 +121,7 @@ pub fn black_move(
     mut beta: HeuristicScore,
     pending_white_move: Option<&BoardMove>,
 ) -> MinimaxOutput {
-    if depth == 0 {
+    if state.is_all_pieces_stationary_with_no_cooldown() && depth == 0 {
         let score = evaluate_material_heuristic(state);
         return MinimaxOutput::Leaf { score };
     }
@@ -127,13 +131,18 @@ pub fn black_move(
         new_state_no_move.apply_move(pending_white_move);
     }
     new_state_no_move.step();
-    let mut best_opponent_move = white_move(&new_state_no_move, depth - 1, alpha, beta);
+    let mut best_opponent_move =
+        white_move(&new_state_no_move, depth.saturating_sub(1), alpha, beta);
     let mut num_leaves = best_opponent_move.num_leaves();
     let mut best_score = best_opponent_move.score();
     beta = beta.min(best_score);
     if best_score > alpha {
-        let possible_moves = state.get_all_possible_moves(Side::Black);
-        // TODO: reorder possible_moves
+        let possible_moves = if depth == 0 {
+            state.get_sorted_quiescent_moves(Side::Black, |kind| MATERIAL_VALUE[kind] as i32)
+        } else {
+            state.get_all_possible_moves(Side::Black)
+            // TODO: reorder possible_moves
+        };
         for board_move in possible_moves {
             let mut new_state = state.clone();
             if let Some(pending_white_move) = pending_white_move {
@@ -141,7 +150,7 @@ pub fn black_move(
             }
             new_state.apply_move(&board_move);
             new_state.step();
-            let opponent_move = white_move(&new_state, depth - 1, alpha, beta);
+            let opponent_move = white_move(&new_state, depth.saturating_sub(1), alpha, beta);
             num_leaves += opponent_move.num_leaves();
             let score = opponent_move.score();
             if score < best_score {

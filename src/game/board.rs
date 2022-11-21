@@ -446,7 +446,10 @@ impl BoardState {
         }
         moves
     }
-    pub fn get_sorted_quiescent_moves(&self, side: Side) -> Vec<BoardMove> {
+    pub fn get_sorted_quiescent_moves<F>(&self, side: Side, f: F) -> Vec<BoardMove>
+    where
+        F: Fn(PieceKind) -> i32,
+    {
         // TODO: search promotion moves?
 
         // prioritize captures by computing value of victim - attacker
@@ -466,8 +469,7 @@ impl BoardState {
                     let mut piece_moves = Vec::new();
                     self.add_possible_moves_for_piece(piece, &mut piece_moves);
                     for board_move in piece_moves {
-                        if self.is_force_capture_move(&board_move) {
-                            let priority = 0;
+                        if let Some(priority) = self.is_force_capture_move_and_get_priority(&board_move, &f) {
                             capture_moves.push((board_move, priority));
                         }
                     }
@@ -483,16 +485,24 @@ impl BoardState {
         all_moves.append(&mut out_of_capture_moves);
         all_moves
     }
-    fn is_force_capture_move(&self, board_move: &BoardMove) -> bool {
+    // f = value function
+    fn is_force_capture_move_and_get_priority<F>(&self, board_move: &BoardMove, f: F) -> Option<i32>
+    where
+        F: Fn(PieceKind) -> i32,
+    {
         if let BoardMove::Normal { piece, target } = board_move &&
             let PieceState::Stationary { position, .. } = piece.state &&
             let Some(target_piece) = self.get_stationary_piece(*target) &&
             let PieceState::Stationary {position: target_position, cooldown: target_cooldown} = target_piece.state {
             let delta = target_position - position;
             let transit_time = delta.dist_linf();
-            transit_time <= target_cooldown
+            if transit_time <= target_cooldown {
+                Some(f(piece.kind) - f(target_piece.kind))
+            } else {
+                None
+            }
         } else {
-            false
+            None
         }
     }
     // TODO: Optimizable across multiple calls
@@ -658,11 +668,15 @@ impl BoardState {
         }
         Ok(Self::new_with_castling(pieces, false))
     }
-    // TODO: Use ForTest?
     pub fn is_all_pieces_stationary(&self) -> bool {
         self.pieces
             .iter()
             .all(|piece| matches!(piece.state, PieceState::Stationary { .. }))
+    }
+    pub fn is_all_pieces_stationary_with_no_cooldown(&self) -> bool {
+        self.pieces.iter().all(
+            |piece| matches!(piece.state, PieceState::Stationary { cooldown, .. } if cooldown == 0),
+        )
     }
 }
 
