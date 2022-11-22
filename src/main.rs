@@ -43,9 +43,17 @@ fn get_diff(board: &BoardState) -> f32 {
         MinimaxOutput::Node { best_move, .. } => best_move,
         MinimaxOutput::Leaf { .. } => BoardMove::None(Side::White),
     };
-    let random_score = get_score(board, random_move.unwrap());
-    let minimax_score = get_score(board, &minimax_move);
+    let random_score = get_average_score(50000, board, random_move.unwrap());
+    let minimax_score = get_average_score(50000, board, &minimax_move);
     minimax_score - random_score
+}
+
+fn get_average_score(n: u32, board: &BoardState, white_move: &BoardMove) -> f32 {
+    let mut total = 0f32;
+    for _ in 0..n {
+        total += get_score(board, white_move);
+    }
+    total / (n as f32)
 }
 
 fn get_score(board: &BoardState, white_move: &BoardMove) -> f32 {
@@ -53,10 +61,7 @@ fn get_score(board: &BoardState, white_move: &BoardMove) -> f32 {
     let black_moves = board_mut.get_all_possible_moves(Side::Black);
     let random_black_move = black_moves.choose(&mut rand::thread_rng()).unwrap();
     board_mut.step(white_move, random_black_move);
-    // step until stationary
-    while !board_mut.is_all_pieces_stationary() {
-        board_mut.step_without_moves();
-    }
+    board_mut.step_until_stationary();
     minimax::evaluate_material_heuristic(&board_mut)
 }
 
