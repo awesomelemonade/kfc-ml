@@ -491,7 +491,9 @@ impl BoardState {
             .map(|(board_move, _priority)| board_move)
             .collect_vec();
         all_moves.append(&mut out_of_capture_moves);
-        all_moves.push(BoardMove::None(side));
+        if all_moves.is_empty() {
+            all_moves.push(BoardMove::None(side));
+        }
         all_moves
     }
     // f = value function
