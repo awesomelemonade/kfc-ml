@@ -198,12 +198,15 @@ fn test_no_move_while_cooldown() {
     board.apply_move(&board_move);
     board.step_n(5);
     let possible_moves = board.get_all_possible_moves(Side::White);
-    expect!(possible_moves, r#"
+    expect!(
+        possible_moves,
+        r#"
         [
             None(
                 White,
             ),
-        ]"#);
+        ]"#
+    );
 }
 
 #[test]

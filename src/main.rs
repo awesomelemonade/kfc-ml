@@ -90,6 +90,9 @@ Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
     println!("scores={:?}", scores);
     let average = scores.iter().sum::<f32>() / scores.len() as f32;
     println!("avg={:?}", average);
+    unsafe {
+        println!("Q_COUNT={}, S_COUNT={}", Q_COUNT, S_COUNT);
+    }
 
     // let board = BoardState::parse_fen("3N4/b3P3/5p1B/2Q2bPP/PnK5/r5N1/7k/3r4").unwrap();
 

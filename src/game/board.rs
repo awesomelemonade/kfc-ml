@@ -13,6 +13,9 @@ pub struct BoardState {
     can_short_castle: EnumMap<Side, bool>,
 }
 
+pub static mut Q_COUNT: u32 = 0;
+pub static mut S_COUNT: u32 = 0;
+
 impl BoardState {
     pub fn pieces(&self) -> &Vec<Piece> {
         &self.pieces
@@ -217,6 +220,23 @@ impl BoardState {
             } => side == piece.side && position == target,
         })
     }
+    pub fn step_until_stationary(&mut self) {
+        // TODO: check intersections among moving pieces
+        // currently just a conservative heuristic
+        let no_intersections = self
+            .pieces
+            .iter()
+            .filter(|piece| piece.state.is_moving())
+            .count()
+            <= 1;
+        if no_intersections {
+            // teleport all pieces to the end
+            self.advance_pieces_by_time::<{ u32::MAX }>();
+        } else {
+            self.step_without_moves();
+            self.step_until_stationary();
+        }
+    }
     pub fn step_n(&mut self, n: u32) {
         for _ in 0..n {
             self.step_without_moves();
@@ -226,6 +246,9 @@ impl BoardState {
         self.step(&BoardMove::None(Side::White), &BoardMove::None(Side::Black));
     }
     pub fn step(&mut self, white_move: &BoardMove, black_move: &BoardMove) {
+        unsafe {
+            S_COUNT += 1;
+        }
         self.apply_move(white_move);
         self.apply_move(black_move);
         fn position_after_step(piece_state: &PieceState) -> (f32, f32) {
@@ -384,11 +407,15 @@ impl BoardState {
             });
             !intersects
         });
+        self.advance_pieces_by_time::<1>();
+    }
+    // Does not check intersections between pieces
+    fn advance_pieces_by_time<const TIME: u32>(&mut self) {
         for piece in &mut self.pieces {
             match &mut piece.state {
                 PieceState::Stationary { cooldown, .. } => {
                     // decrement cooldown
-                    *cooldown = cooldown.saturating_sub(1);
+                    *cooldown = cooldown.saturating_sub(TIME);
                 }
                 PieceState::Moving {
                     x,
@@ -401,7 +428,7 @@ impl BoardState {
                             velocity: (vx, vy),
                         },
                 } => {
-                    if *turns_left == 1 {
+                    if *turns_left <= TIME {
                         // check if it's a pawn promotion
                         let is_pawn_promotion = piece.kind == PieceKind::Pawn
                             && target.y
@@ -414,13 +441,13 @@ impl BoardState {
                         }
                         piece.state = PieceState::Stationary {
                             position: *target,
-                            cooldown: PIECE_COOLDOWN,
+                            cooldown: PIECE_COOLDOWN.saturating_sub(TIME - *turns_left),
                         }
                     } else {
-                        *x += *vx;
-                        *y += *vy;
-                        *turns_left -= 1;
-                        *priority += 1;
+                        *x += (TIME as f32) * *vx;
+                        *y += (TIME as f32) * *vy;
+                        *turns_left -= TIME;
+                        *priority += TIME;
                     }
                 }
             };
@@ -458,6 +485,9 @@ impl BoardState {
     where
         F: Fn(PieceKind) -> i32,
     {
+        unsafe {
+            Q_COUNT += 1;
+        }
         // TODO: search promotion moves?
 
         // prioritize captures by computing value of victim - attacker

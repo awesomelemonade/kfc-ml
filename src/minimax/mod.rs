@@ -21,9 +21,7 @@ type HeuristicScore = f32;
 
 pub fn evaluate_material_heuristic(state: &BoardState) -> HeuristicScore {
     let mut state = state.clone();
-    while !state.is_all_pieces_stationary() {
-        state.step_without_moves();
-    }
+    state.step_until_stationary();
     // count up material
     let material_value: i32 = state
         .pieces()
@@ -134,7 +132,13 @@ pub fn black_move(
     };
     for board_move in possible_moves {
         let mut new_state = state.clone();
-        new_state.step(pending_white_move, &board_move);
+        if depth == 0 {
+            new_state.apply_move(pending_white_move);
+            new_state.apply_move(&board_move);
+            new_state.step_until_stationary();
+        } else {
+            new_state.step(pending_white_move, &board_move);
+        }
         let opponent_move = white_move(&new_state, depth.saturating_sub(1), alpha, beta);
         num_leaves += opponent_move.num_leaves();
         let score = opponent_move.score();
