@@ -71,6 +71,7 @@ impl BoardState {
             vec
         }
         match board_move {
+            BoardMove::None(_side) => true,
             BoardMove::Normal { piece, target } => {
                 let target = *target;
                 match piece.state {
@@ -151,6 +152,7 @@ impl BoardState {
     }
     pub fn apply_move(&mut self, board_move: &BoardMove) {
         match board_move {
+            BoardMove::None(_side) => {}
             BoardMove::LongCastle(_side) => {
                 // TODO
                 // let rook_position = match side {
@@ -217,10 +219,15 @@ impl BoardState {
     }
     pub fn step_n(&mut self, n: u32) {
         for _ in 0..n {
-            self.step();
+            self.step_without_moves();
         }
     }
-    pub fn step(&mut self) {
+    pub fn step_without_moves(&mut self) {
+        self.step(&BoardMove::None(Side::White), &BoardMove::None(Side::Black));
+    }
+    pub fn step(&mut self, white_move: &BoardMove, black_move: &BoardMove) {
+        self.apply_move(white_move);
+        self.apply_move(black_move);
         fn position_after_step(piece_state: &PieceState) -> (f32, f32) {
             match piece_state {
                 PieceState::Stationary { position, .. } => (position.x as f32, position.y as f32),
@@ -444,6 +451,7 @@ impl BoardState {
                 }
             }
         }
+        moves.push(BoardMove::None(side));
         moves
     }
     pub fn get_sorted_quiescent_moves<F>(&self, side: Side, f: F) -> Vec<BoardMove>
@@ -478,11 +486,12 @@ impl BoardState {
         }
 
         let mut all_moves = capture_moves
-            .iter()
-            .sorted_by_key(|(_board_move, priority)| priority)
-            .map(|(board_move, _priority)| board_move.clone()) // TODO-someday: likely an unnecessary clone, but might be compiled out
+            .into_iter()
+            .sorted_by_key(|(_board_move, priority)| *priority)
+            .map(|(board_move, _priority)| board_move)
             .collect_vec();
         all_moves.append(&mut out_of_capture_moves);
+        all_moves.push(BoardMove::None(side));
         all_moves
     }
     // f = value function
@@ -519,6 +528,7 @@ impl BoardState {
             }
         })
     }
+    // TODO-someday: return nonempty list?
     pub fn get_all_possible_moves(&self, side: Side) -> Vec<BoardMove> {
         let mut moves: Vec<BoardMove> = Vec::new();
         for piece in self.pieces.iter() {
@@ -527,6 +537,7 @@ impl BoardState {
                 self.add_possible_moves_for_piece(piece, &mut moves);
             }
         }
+        moves.push(BoardMove::None(side));
         moves
     }
     pub fn add_possible_moves_for_piece(&self, piece: &Piece, moves: &mut Vec<BoardMove>) {
@@ -682,6 +693,7 @@ impl BoardState {
 
 #[derive(Debug, Clone)]
 pub enum BoardMove {
+    None(Side),
     LongCastle(Side),
     ShortCastle(Side),
     Normal { piece: Piece, target: Position }, // TODO-someday: PieceState should always be stationary here - represent this differently?

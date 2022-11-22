@@ -41,26 +41,21 @@ fn get_diff(board: &BoardState) -> f32 {
     println!("NUM LEAVES: {}", num_leaves); // TODO: remove
     let minimax_move = match minimax_output {
         MinimaxOutput::Node { best_move, .. } => best_move,
-        MinimaxOutput::Leaf { .. } => None,
+        MinimaxOutput::Leaf { .. } => BoardMove::None(Side::White),
     };
-    let random_score = get_score(board, random_move);
-    let minimax_score = get_score(board, minimax_move.as_ref());
+    let random_score = get_score(board, random_move.unwrap());
+    let minimax_score = get_score(board, &minimax_move);
     minimax_score - random_score
 }
 
-fn get_score(board: &BoardState, white_move: Option<&BoardMove>) -> f32 {
+fn get_score(board: &BoardState, white_move: &BoardMove) -> f32 {
     let mut board_mut = board.clone();
     let black_moves = board_mut.get_all_possible_moves(Side::Black);
-    let random_black_move = black_moves.choose(&mut rand::thread_rng());
-    if let Some(white_move) = white_move {
-        board_mut.apply_move(white_move);
-    }
-    if let Some(black_move) = random_black_move {
-        board_mut.apply_move(black_move)
-    }
+    let random_black_move = black_moves.choose(&mut rand::thread_rng()).unwrap();
+    board_mut.step(white_move, random_black_move);
     // step until stationary
     while !board_mut.is_all_pieces_stationary() {
-        board_mut.step();
+        board_mut.step_without_moves();
     }
     minimax::evaluate_material_heuristic(&board_mut)
 }

@@ -22,7 +22,7 @@ type HeuristicScore = f32;
 pub fn evaluate_material_heuristic(state: &BoardState) -> HeuristicScore {
     let mut state = state.clone();
     while !state.is_all_pieces_stationary() {
-        state.step();
+        state.step_without_moves();
     }
     // count up material
     let material_value: i32 = state
@@ -43,7 +43,7 @@ pub fn evaluate_material_heuristic(state: &BoardState) -> HeuristicScore {
 #[derive(Debug, Clone)]
 pub enum MinimaxOutput {
     Node {
-        best_move: Option<BoardMove>,
+        best_move: BoardMove,
         best_score: HeuristicScore,
         num_leaves: u32,
         next: Box<MinimaxOutput>,
@@ -79,38 +79,35 @@ pub fn white_move(
         let score = evaluate_material_heuristic(state);
         return MinimaxOutput::Leaf { score };
     }
-    let mut best_move = Option::None;
-    let mut best_opponent_move = black_move(state, depth, alpha, beta, None);
-    let mut num_leaves = best_opponent_move.num_leaves();
-    let mut best_score = best_opponent_move.score();
-    alpha = alpha.max(best_score);
-    if best_score < beta {
-        let possible_moves = if depth == 0 {
-            state.get_sorted_quiescent_moves(Side::White, |kind| MATERIAL_VALUE[kind] as i32)
-        } else {
-            state.get_all_possible_moves(Side::White)
-            // TODO: reorder possible_moves
-        };
-        for board_move in possible_moves {
-            let opponent_move = black_move(state, depth, alpha, beta, Some(&board_move));
-            num_leaves += opponent_move.num_leaves();
-            let score = opponent_move.score();
-            if score > best_score {
-                best_score = score;
-                best_move = Some(board_move);
-                best_opponent_move = opponent_move;
-            }
-            alpha = alpha.max(best_score);
-            if best_score >= beta {
-                break;
-            }
+    let mut best_move = BoardMove::None(Side::White);
+    let mut best_opponent_move = None;
+    let mut best_score = f32::MIN;
+    let mut num_leaves = 0;
+    let possible_moves = if depth == 0 {
+        state.get_sorted_quiescent_moves(Side::White, |kind| MATERIAL_VALUE[kind] as i32)
+    } else {
+        state.get_all_possible_moves(Side::White)
+        // TODO: reorder possible_moves
+    };
+    for board_move in possible_moves {
+        let opponent_move = black_move(state, depth, alpha, beta, &board_move);
+        num_leaves += opponent_move.num_leaves();
+        let score = opponent_move.score();
+        if score > best_score {
+            best_move = board_move;
+            best_opponent_move = Some(opponent_move);
+            best_score = score;
+        }
+        alpha = alpha.max(best_score);
+        if best_score >= beta {
+            break;
         }
     }
     MinimaxOutput::Node {
         best_move,
         best_score,
         num_leaves,
-        next: Box::new(best_opponent_move),
+        next: Box::new(best_opponent_move.unwrap()),
     }
 }
 
@@ -119,55 +116,42 @@ pub fn black_move(
     depth: u32,
     alpha: HeuristicScore,
     mut beta: HeuristicScore,
-    pending_white_move: Option<&BoardMove>,
+    pending_white_move: &BoardMove,
 ) -> MinimaxOutput {
     if state.is_all_pieces_stationary_with_no_cooldown() && depth == 0 {
         let score = evaluate_material_heuristic(state);
         return MinimaxOutput::Leaf { score };
     }
-    let mut best_move = Option::None;
-    let mut new_state_no_move = state.clone();
-    if let Some(pending_white_move) = pending_white_move {
-        new_state_no_move.apply_move(pending_white_move);
-    }
-    new_state_no_move.step();
-    let mut best_opponent_move =
-        white_move(&new_state_no_move, depth.saturating_sub(1), alpha, beta);
-    let mut num_leaves = best_opponent_move.num_leaves();
-    let mut best_score = best_opponent_move.score();
-    beta = beta.min(best_score);
-    if best_score > alpha {
-        let possible_moves = if depth == 0 {
-            state.get_sorted_quiescent_moves(Side::Black, |kind| MATERIAL_VALUE[kind] as i32)
-        } else {
-            state.get_all_possible_moves(Side::Black)
-            // TODO: reorder possible_moves
-        };
-        for board_move in possible_moves {
-            let mut new_state = state.clone();
-            if let Some(pending_white_move) = pending_white_move {
-                new_state.apply_move(pending_white_move);
-            }
-            new_state.apply_move(&board_move);
-            new_state.step();
-            let opponent_move = white_move(&new_state, depth.saturating_sub(1), alpha, beta);
-            num_leaves += opponent_move.num_leaves();
-            let score = opponent_move.score();
-            if score < best_score {
-                best_score = score;
-                best_move = Some(board_move);
-                best_opponent_move = opponent_move;
-            }
-            beta = beta.min(best_score);
-            if best_score <= alpha {
-                break;
-            }
+    let mut best_move = BoardMove::None(Side::Black);
+    let mut best_opponent_move = None;
+    let mut best_score = f32::MAX;
+    let mut num_leaves = 0;
+    let possible_moves = if depth == 0 {
+        state.get_sorted_quiescent_moves(Side::Black, |kind| MATERIAL_VALUE[kind] as i32)
+    } else {
+        state.get_all_possible_moves(Side::Black)
+        // TODO: reorder possible_moves
+    };
+    for board_move in possible_moves {
+        let mut new_state = state.clone();
+        new_state.step(pending_white_move, &board_move);
+        let opponent_move = white_move(&new_state, depth.saturating_sub(1), alpha, beta);
+        num_leaves += opponent_move.num_leaves();
+        let score = opponent_move.score();
+        if score < best_score {
+            best_score = score;
+            best_move = board_move;
+            best_opponent_move = Some(opponent_move);
+        }
+        beta = beta.min(best_score);
+        if best_score <= alpha {
+            break;
         }
     }
     MinimaxOutput::Node {
         best_move,
         best_score,
         num_leaves,
-        next: Box::new(best_opponent_move),
+        next: Box::new(best_opponent_move.unwrap()),
     }
 }
