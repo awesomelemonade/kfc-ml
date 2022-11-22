@@ -270,3 +270,19 @@ fn test_pawn_promotion() {
         r#""Q.......\n........\n........\n........\n........\n........\n........\n........""#
     );
 }
+
+#[test]
+fn test_step_until_stationary() {
+    let mut board = BoardState::parse_fen("8/8/8/P7/8/8/8/8").unwrap();
+    let board_move = find_move_by_kind(&board, Side::White, PieceKind::Pawn).unwrap();
+    board.apply_move(&board_move);
+    board.step_until_stationary();
+    expect!(
+        board.to_stationary_map_combo(),
+        r#""........\n........\nP.......\n........\n........\n........\n........\n........""#
+    );
+    expect!(
+        board.to_stationary_map_cooldowns(),
+        r#""........\n........\n0.......\n........\n........\n........\n........\n........""#
+    );
+}
