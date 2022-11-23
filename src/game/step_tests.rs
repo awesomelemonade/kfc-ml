@@ -272,11 +272,11 @@ fn test_pawn_promotion() {
 }
 
 #[test]
-fn test_step_until_stationary() {
+fn test_step_until_stationary_with_no_cooldown() {
     let mut board = BoardState::parse_fen("8/8/8/P7/8/8/8/8").unwrap();
     let board_move = find_move_by_kind(&board, Side::White, PieceKind::Pawn).unwrap();
     board.apply_move(&board_move);
-    board.step_until_stationary();
+    board.step_until_stationary_with_no_cooldown();
     expect!(
         board.to_stationary_map_combo(),
         r#""........\n........\nP.......\n........\n........\n........\n........\n........""#
