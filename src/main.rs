@@ -61,7 +61,6 @@ fn get_score(board: &BoardState, white_move: &BoardMove) -> f32 {
     let black_moves = board_mut.get_all_possible_moves(Side::Black);
     let random_black_move = black_moves.choose(&mut rand::thread_rng()).unwrap();
     board_mut.step(white_move, random_black_move);
-    board_mut.step_until_stationary();
     minimax::evaluate_material_heuristic(&board_mut)
 }
 

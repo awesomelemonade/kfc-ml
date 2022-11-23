@@ -220,7 +220,30 @@ impl BoardState {
             } => side == piece.side && position == target,
         })
     }
-    pub fn step_until_stationary(&mut self) {
+    pub fn step_until_one_becomes_stationary(&mut self) -> bool {
+        let min_turns_left = self
+            .pieces
+            .iter()
+            .filter_map(|piece| {
+                if let PieceState::Moving {
+                    target: MoveTarget { turns_left, .. },
+                    ..
+                } = piece.state
+                {
+                    Some(turns_left)
+                } else {
+                    None
+                }
+            })
+            .min();
+        if let Some(min_turns_left) = min_turns_left {
+            self.step_n(min_turns_left);
+            true
+        } else {
+            false
+        }
+    }
+    pub fn step_until_stationary_with_no_cooldown(&mut self) {
         // TODO: check intersections among moving pieces
         // currently just a conservative heuristic
         let no_intersections = self
@@ -231,15 +254,27 @@ impl BoardState {
             <= 1;
         if no_intersections {
             // teleport all pieces to the end
-            self.advance_pieces_by_time::<{ u32::MAX }>();
+            self.advance_pieces_by_time(u32::MAX);
         } else {
             self.step_without_moves();
-            self.step_until_stationary();
+            self.step_until_stationary_with_no_cooldown();
         }
     }
     pub fn step_n(&mut self, n: u32) {
-        for _ in 0..n {
+        let no_intersections = self
+            .pieces
+            .iter()
+            .filter(|piece| piece.state.is_moving())
+            .count()
+            <= 1;
+        if no_intersections {
+            // teleport all pieces to the end
+            self.advance_pieces_by_time(n);
+        } else {
             self.step_without_moves();
+            if n > 1 {
+                self.step_n(n - 1);
+            }
         }
     }
     pub fn step_without_moves(&mut self) {
@@ -407,15 +442,15 @@ impl BoardState {
             });
             !intersects
         });
-        self.advance_pieces_by_time::<1>();
+        self.advance_pieces_by_time(1);
     }
     // Does not check intersections between pieces
-    fn advance_pieces_by_time<const TIME: u32>(&mut self) {
+    fn advance_pieces_by_time(&mut self, time: u32) {
         for piece in &mut self.pieces {
             match &mut piece.state {
                 PieceState::Stationary { cooldown, .. } => {
                     // decrement cooldown
-                    *cooldown = cooldown.saturating_sub(TIME);
+                    *cooldown = cooldown.saturating_sub(time);
                 }
                 PieceState::Moving {
                     x,
@@ -428,7 +463,7 @@ impl BoardState {
                             velocity: (vx, vy),
                         },
                 } => {
-                    if *turns_left <= TIME {
+                    if *turns_left <= time {
                         // check if it's a pawn promotion
                         let is_pawn_promotion = piece.kind == PieceKind::Pawn
                             && target.y
@@ -441,13 +476,13 @@ impl BoardState {
                         }
                         piece.state = PieceState::Stationary {
                             position: *target,
-                            cooldown: PIECE_COOLDOWN.saturating_sub(TIME - *turns_left),
+                            cooldown: PIECE_COOLDOWN.saturating_sub(time - *turns_left),
                         }
                     } else {
-                        *x += (TIME as f32) * *vx;
-                        *y += (TIME as f32) * *vy;
-                        *turns_left -= TIME;
-                        *priority += TIME;
+                        *x += (time as f32) * *vx;
+                        *y += (time as f32) * *vy;
+                        *turns_left -= time;
+                        *priority += time;
                     }
                 }
             };
@@ -521,9 +556,7 @@ impl BoardState {
             .map(|(board_move, _priority)| board_move)
             .collect_vec();
         all_moves.append(&mut out_of_capture_moves);
-        if all_moves.is_empty() {
-            all_moves.push(BoardMove::None(side));
-        }
+        all_moves.push(BoardMove::None(side));
         all_moves
     }
     // f = value function
