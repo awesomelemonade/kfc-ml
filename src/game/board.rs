@@ -286,22 +286,19 @@ impl BoardState {
         } = moving_piece.state
         {
             self.pieces.retain(|piece| {
-                if piece.side == moving_piece.side {
-                    true
+                if piece.side != moving_piece.side &&
+                    let PieceState::Stationary { position, .. } = piece.state {
+                    // will this piece get retained in the next n steps?
+                    // will capturer (x, y) + t * (vx, vy) intersect with position?
+                    let delta_x = capturer_x - (position.x as f32);
+                    let delta_y = capturer_y - (position.y as f32);
+                    !is_within_distance_squared(
+                        (delta_x, delta_y),
+                        (capturer_vx, capturer_vy),
+                        n.min(turns_left as f32),
+                    )
                 } else {
-                    if let PieceState::Stationary { position, .. } = piece.state {
-                        // will this piece get retained in the next n steps?
-                        // will capturer (x, y) + t * (vx, vy) intersect with position?
-                        let delta_x = capturer_x - (position.x as f32);
-                        let delta_y = capturer_y - (position.y as f32);
-                        !is_within_distance_squared(
-                            (delta_x, delta_y),
-                            (capturer_vx, capturer_vy),
-                            n.min(turns_left as f32),
-                        )
-                    } else {
-                        true
-                    }
+                    true
                 }
             });
         }
@@ -428,7 +425,7 @@ impl BoardState {
                     let diff_y = y2 - y;
                     // optimization: pieces cannot move more than 2 diagonal squares relaltive to another piece
                     // (2 * sqrt(2)) ^ 2 = 8
-                    if diff_x * diff_x + diff_y * diff_y >= 8f32 {
+                    if diff_x * diff_x + diff_y * diff_y > 8f32 {
                         return false;
                     }
                     let v_diff_x = vx2 - vx;
