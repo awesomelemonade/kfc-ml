@@ -16,6 +16,8 @@ pub struct BoardState {
 pub static mut Q_COUNT: u32 = 0;
 pub static mut S_COUNT: u32 = 0;
 
+const DISTANCE_THRESHOLD_SQUARED: f32 = 0.95f32 * 0.95f32;
+
 impl BoardState {
     pub fn pieces(&self) -> &Vec<Piece> {
         &self.pieces
@@ -84,14 +86,15 @@ impl BoardState {
                         if position == target {
                             return false;
                         }
-                        let target_piece =
-                            self.get_piece_including_moving_on_side(target, piece.side);
-
                         // check that target is not occupied by friendly unit
                         // Ensure that no moving pieces has this target as the target
-                        if let Some(target_piece) = target_piece && target_piece.side == piece.side {
-                            return false
+                        if !self.is_valid_destination(piece.side, target) {
+                            return false;
                         }
+                        let target_piece = self.get_stationary_piece(target); // enemy piece
+                        debug_assert!(
+                            target_piece.map_or(true, |enemy_piece| enemy_piece.side != piece.side)
+                        );
                         match piece.kind {
                             PieceKind::Pawn => {
                                 let delta = target - position;
@@ -167,6 +170,10 @@ impl BoardState {
             BoardMove::ShortCastle(_side) => {}
             BoardMove::Normal { piece, target } => {
                 let target = *target;
+                // ensure that the piece is not already moving
+                debug_assert!(piece.state.is_stationary());
+                // ensure that the target is not of a piece on our own side
+                debug_assert!(self.is_valid_destination(piece.side, target));
                 if let PieceState::Stationary { position, .. } = piece.state {
                     let Position { x, y } = position;
                     let delta = target - position;
@@ -243,6 +250,62 @@ impl BoardState {
             false
         }
     }
+    fn handle_intersections_for_singular_moving_piece(&mut self, n: f32) {
+        fn is_within_distance_squared(
+            p @ (x, y): (f32, f32),
+            v @ (vx, vy): (f32, f32),
+            n: f32,
+        ) -> bool {
+            let t = get_t_clamped(p, v, n);
+            let intersection_x = x + vx * t;
+            let intersection_y = y + vy * t;
+            intersection_x * intersection_x + intersection_y * intersection_y
+                <= DISTANCE_THRESHOLD_SQUARED
+        }
+        fn get_t_clamped((x, y): (f32, f32), (vx, vy): (f32, f32), n: f32) -> f32 {
+            // at what t will p + v * t be closest to (0, 0)?
+            // t = (-px * vx - py * vy) / (vx^2 + vy^2)
+            ((-x * vx - y * vy) / (vx * vx + vy * vy)).clamp(0f32, n)
+        }
+        // we get the moving piece, analyze the target, and remove pieces
+        let moving_piece = self
+            .pieces
+            .iter()
+            .find(|piece| piece.state.is_moving())
+            .cloned();
+        if let Some(moving_piece) = moving_piece &&
+            let PieceState::Moving {
+            x: capturer_x,
+            y: capturer_y,
+            target:
+                MoveTarget {
+                    velocity: (capturer_vx, capturer_vy),
+                    turns_left,
+                    ..
+                },
+        } = moving_piece.state
+        {
+            self.pieces.retain(|piece| {
+                if piece.side == moving_piece.side {
+                    true
+                } else {
+                    if let PieceState::Stationary { position, .. } = piece.state {
+                        // will this piece get retained in the next n steps?
+                        // will capturer (x, y) + t * (vx, vy) intersect with position?
+                        let delta_x = capturer_x - (position.x as f32);
+                        let delta_y = capturer_y - (position.y as f32);
+                        !is_within_distance_squared(
+                            (delta_x, delta_y),
+                            (capturer_vx, capturer_vy),
+                            n.min(turns_left as f32),
+                        )
+                    } else {
+                        true
+                    }
+                }
+            });
+        }
+    }
     pub fn step_until_stationary_with_no_cooldown(&mut self) {
         // TODO: check intersections among moving pieces
         // currently just a conservative heuristic
@@ -254,6 +317,7 @@ impl BoardState {
             <= 1;
         if no_intersections {
             // teleport all pieces to the end
+            self.handle_intersections_for_singular_moving_piece(f32::MAX);
             self.advance_pieces_by_time(u32::MAX);
         } else {
             self.step_without_moves();
@@ -269,7 +333,9 @@ impl BoardState {
             <= 1;
         if no_intersections {
             // teleport all pieces to the end
+            self.handle_intersections_for_singular_moving_piece(n as f32);
             self.advance_pieces_by_time(n);
+            debug_assert!(!self.has_overlapping_pieces());
         } else {
             self.step_without_moves();
             if n > 1 {
@@ -299,7 +365,6 @@ impl BoardState {
                 } => (x + vx, y + vy),
             }
         }
-        const DISTANCE_THRESHOLD_SQUARED: f32 = 0.95f32 * 0.95f32;
         fn intersects((x, y): (f32, f32), (x2, y2): (f32, f32)) -> bool {
             let dx = x - x2;
             let dy = y - y2;
@@ -443,6 +508,7 @@ impl BoardState {
             !intersects
         });
         self.advance_pieces_by_time(1);
+        debug_assert!(!self.has_overlapping_pieces());
     }
     // Does not check intersections between pieces
     fn advance_pieces_by_time(&mut self, time: u32) {
@@ -533,17 +599,20 @@ impl BoardState {
         // OR if this piece is a target
         let mut capture_moves: Vec<(BoardMove, i32)> = Vec::new();
         let mut out_of_capture_moves: Vec<BoardMove> = Vec::new();
-        for piece in self.pieces.iter() {
+        for piece in &self.pieces {
             // TODO-someday: should be looping through stationary pieces and filter by side
             if piece.side == side {
-                if let PieceState::Stationary { position, .. } = piece.state && self.is_target_of_capture(&position) {
-                    self.add_possible_moves_for_piece(piece, &mut out_of_capture_moves);
-                } else {
-                    let mut piece_moves = Vec::new();
-                    self.add_possible_moves_for_piece(piece, &mut piece_moves);
-                    for board_move in piece_moves {
-                        if let Some(priority) = self.is_force_capture_move_and_get_priority(&board_move, &f) {
-                            capture_moves.push((board_move, priority));
+                if let PieceState::Stationary { position, .. } = piece.state {
+                    if self.is_target_of_capture(&position) {
+                        self.add_possible_moves_for_piece(piece, &mut out_of_capture_moves);
+                    } else {
+                        // attempt to capture other pieces
+                        for to_be_captured in &self.pieces {
+                            let potential_move = self.get_force_capture_move(to_be_captured, piece);
+                            if let Some(board_move) = potential_move {
+                                let priority = f(piece.kind) - f(to_be_captured.kind); // capturer - target
+                                capture_moves.push((board_move, priority));
+                            }
                         }
                     }
                 }
@@ -557,21 +626,30 @@ impl BoardState {
             .collect_vec();
         all_moves.append(&mut out_of_capture_moves);
         all_moves.push(BoardMove::None(side));
+        debug_assert!(all_moves.iter().all(|board_move| {
+            match board_move {
+                BoardMove::Normal { target, .. } => self.is_valid_destination(side, *target),
+                _ => true,
+            }
+        }));
         all_moves
     }
-    // f = value function
-    fn is_force_capture_move_and_get_priority<F>(&self, board_move: &BoardMove, f: F) -> Option<i32>
-    where
-        F: Fn(PieceKind) -> i32,
-    {
-        if let BoardMove::Normal { piece, target } = board_move &&
-            let PieceState::Stationary { position, .. } = piece.state &&
-            let Some(target_piece) = self.get_stationary_piece(*target) &&
-            let PieceState::Stationary {position: target_position, cooldown: target_cooldown} = target_piece.state {
-            let delta = target_position - position;
+    // TODO-someday: should be 2 stationary pieces
+    fn get_force_capture_move(&self, piece: &Piece, capturer: &Piece) -> Option<BoardMove> {
+        if piece.side == capturer.side {
+            return None;
+        }
+        if let PieceState::Stationary { position, cooldown } = piece.state && let PieceState::Stationary { position: capturer_position, cooldown: capturer_cooldown } = capturer.state && capturer_cooldown == 0 {
+
+            let delta = position - capturer_position;
             let transit_time = delta.dist_linf();
-            if transit_time <= target_cooldown {
-                Some(f(piece.kind) - f(target_piece.kind))
+            if cooldown >= transit_time {
+                let board_move = BoardMove::Normal { piece: *capturer, target: position };
+                if self.can_move(&board_move) {
+                    Some(board_move)
+                } else {
+                    None
+                }
             } else {
                 None
             }
@@ -603,6 +681,12 @@ impl BoardState {
             }
         }
         moves.push(BoardMove::None(side));
+        debug_assert!(moves.iter().all(|board_move| {
+            match board_move {
+                BoardMove::Normal { target, .. } => self.is_valid_destination(side, *target),
+                _ => true,
+            }
+        }));
         moves
     }
     pub fn add_possible_moves_for_piece(&self, piece: &Piece, moves: &mut Vec<BoardMove>) {
@@ -754,6 +838,36 @@ impl BoardState {
             |piece| matches!(piece.state, PieceState::Stationary { cooldown, .. } if cooldown == 0),
         )
     }
+    fn has_overlapping_pieces(&self) -> bool {
+        self.pieces.iter().tuple_combinations().any(|(a, b)| {
+            if let PieceState::Stationary { position: a_position, .. } = a.state &&
+                let PieceState::Stationary { position: b_position, .. } = b.state {
+                a_position == b_position
+            } else {
+                false
+            }
+        })
+    }
+    // whether destination is a valid destination for a piece of a side
+    fn is_valid_destination(&self, side: Side, destination: Position) -> bool {
+        // ensures the destination is not some other piece's target
+        // or has an existing stationary piece
+        !self.pieces.iter().any(|piece| {
+            if side != piece.side {
+                return false;
+            }
+            match piece.state {
+                PieceState::Stationary {
+                    position: piece_position,
+                    ..
+                } => destination == piece_position,
+                PieceState::Moving {
+                    target: MoveTarget { target, .. },
+                    ..
+                } => destination == target,
+            }
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -786,23 +900,7 @@ impl MoveGenerator<'_> {
         }
     }
     fn is_valid_destination(&self, destination: Position) -> bool {
-        // ensures the destination is not some other piece's target
-        // or has an existing stationary piece
-        !self.board.pieces.iter().any(|piece| {
-            if self.side != piece.side {
-                return false;
-            }
-            match piece.state {
-                PieceState::Stationary {
-                    position: piece_position,
-                    ..
-                } => destination == piece_position,
-                PieceState::Moving {
-                    target: MoveTarget { target, .. },
-                    ..
-                } => destination == target,
-            }
-        })
+        self.board.is_valid_destination(self.side, destination)
     }
     fn is_valid_force_no_capture_destination(&self, destination: Position) -> bool {
         // used by pawns only
