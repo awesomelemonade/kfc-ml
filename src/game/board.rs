@@ -23,6 +23,11 @@ impl BoardState {
         &self.pieces
     }
 
+    // TODO-someday: For_test module?
+    pub fn pieces_mut(&mut self) -> &mut Vec<Piece> {
+        &mut self.pieces
+    }
+
     fn new_with_castling(pieces: Vec<Piece>, enable_castling: bool) -> Self {
         Self {
             pieces,
