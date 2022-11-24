@@ -16,7 +16,9 @@ pub struct BoardState {
 pub static mut Q_COUNT: u32 = 0;
 pub static mut S_COUNT: u32 = 0;
 
-const DISTANCE_THRESHOLD_SQUARED: f32 = 0.95f32 * 0.95f32;
+// has to be less than sqrt(2)/2 to ensure bishops do not capture squares
+//                                          it is not supposed to capture
+const DISTANCE_THRESHOLD_SQUARED: f32 = 0.7f32 * 0.7f32;
 
 impl BoardState {
     pub fn pieces(&self) -> &Vec<Piece> {

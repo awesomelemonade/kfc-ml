@@ -43,6 +43,14 @@ fn find_move_by_kind(board: &BoardState, side: Side, kind: PieceKind) -> Option<
     )
 }
 
+fn find_move_by_target(board: &BoardState, side: Side, target: Position) -> Option<BoardMove> {
+    find_move(
+        board,
+        side,
+        |p| matches!(p, BoardMove::Normal { target: move_target, .. } if move_target == &target),
+    )
+}
+
 #[test]
 fn test_step_no_move() {
     let mut board = BoardState::parse_fen("3N4/b3P3/5p1B/2Q2bPP/PnK5/r5N1/7k/3r4").unwrap();
@@ -284,5 +292,19 @@ fn test_step_until_stationary_with_no_cooldown() {
     expect!(
         board.to_stationary_map_cooldowns(),
         r#""........\n........\n0.......\n........\n........\n........\n........\n........""#
+    );
+}
+
+#[test]
+fn test_bishop_captures() {
+    let mut board = BoardState::parse_fen("Br6/r1r5/1r1r4/2r1r3/3r1r2/4r1r1/5r1r/6rr").unwrap();
+    println!("{:?}", board.get_all_possible_moves(Side::White));
+    let board_move = find_move_by_target(&board, Side::White, (7u32, 7u32).into()).unwrap();
+    board.apply_move(&board_move);
+    board.step_until_one_becomes_stationary();
+    // ensure it captures on diagonals, but not the squares directly adjacent to the diagonal squares
+    expect!(
+        board.to_stationary_map_combo(),
+        r#"".r......\nr.r.....\n.r.r....\n..r.r...\n...r.r..\n....r.r.\n.....r.r\n......rB""#
     );
 }
