@@ -607,7 +607,13 @@ impl BoardState {
             // TODO-someday: should be looping through stationary pieces and filter by side
             if piece.side == side {
                 if let PieceState::Stationary { position, .. } = piece.state {
-                    if self.is_target_of_capture(&position) {
+                    let pawn_is_about_to_be_promoted = piece.kind == PieceKind::Pawn
+                        && position.y
+                            == match piece.side {
+                                Side::White => 1u32,
+                                Side::Black => (BOARD_SIZE as u32) - 2u32,
+                            };
+                    if pawn_is_about_to_be_promoted || self.is_target_of_capture(&position) {
                         self.add_possible_moves_for_piece(piece, &mut out_of_capture_moves);
                     } else {
                         // attempt to capture other pieces
