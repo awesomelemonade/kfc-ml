@@ -2,6 +2,8 @@ core!();
 
 use itertools::Itertools;
 
+use crate::minimax;
+
 use super::*;
 
 lazy_static! {
@@ -242,11 +244,7 @@ fn num_moves_per_type(moves: &Vec<BoardMove>) -> Vec<(PieceKind, usize)> {
             let count = moves
                 .iter()
                 .filter(|board_move| {
-                    if let BoardMove::Normal { piece, .. } = board_move {
-                        piece.kind == kind
-                    } else {
-                        false
-                    }
+                    matches!(board_move, BoardMove::Normal { piece, .. } if piece.kind == kind)
                 })
                 .count();
             (kind, count)
@@ -259,7 +257,7 @@ fn test_initial_possible_moves() {
     let board = BoardState::new_initial_state();
     let moves = board.get_all_possible_moves(Side::White);
     let num_moves_per_type = num_moves_per_type(&moves);
-    expect!(moves.len(), "20");
+    expect!(moves.len(), "21");
     expect!(
         num_moves_per_type,
         r#"
@@ -296,7 +294,7 @@ fn test_initial_possible_moves() {
 fn test_random_state_possible_moves_naive() {
     let moves = RANDOM_BOARD.get_all_possible_moves_naive(Side::White);
     let num_moves_per_type = num_moves_per_type(&moves);
-    expect!(moves.len(), "38");
+    expect!(moves.len(), "39");
     expect!(
         num_moves_per_type,
         r#"
@@ -353,5 +351,60 @@ fn test_random_state_visualize_queen_move() {
     expect!(
         visualization,
         r#""..X.....\nX.X.....\n.XXX....\nXX.XXX..\n.X.X....\n....X...\n.....X..\n......X.""#
+    );
+}
+
+#[test]
+fn test_quiescent_prioritize_taking_queen() {
+    let mut board = BoardState::parse_fen("8/8/8/3q1r2/4P3/8/8/8").unwrap();
+    board.pieces_mut().iter_mut().for_each(|piece| {
+        if piece.side == Side::Black && let PieceState::Stationary { cooldown, .. } = &mut piece.state {
+            *cooldown = 10;
+        }
+    });
+    let quiescent_moves =
+        board.get_sorted_quiescent_moves(Side::White, |kind| minimax::MATERIAL_VALUE[kind] as i32);
+    expect!(
+        quiescent_moves,
+        r#"
+        [
+            Normal {
+                piece: Piece {
+                    side: White,
+                    kind: Pawn,
+                    state: Stationary {
+                        position: Position {
+                            x: 4,
+                            y: 4,
+                        },
+                        cooldown: 0,
+                    },
+                },
+                target: Position {
+                    x: 3,
+                    y: 3,
+                },
+            },
+            Normal {
+                piece: Piece {
+                    side: White,
+                    kind: Pawn,
+                    state: Stationary {
+                        position: Position {
+                            x: 4,
+                            y: 4,
+                        },
+                        cooldown: 0,
+                    },
+                },
+                target: Position {
+                    x: 5,
+                    y: 3,
+                },
+            },
+            None(
+                White,
+            ),
+        ]"#
     );
 }

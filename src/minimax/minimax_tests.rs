@@ -31,7 +31,7 @@ const SEARCH_DEPTH: u32 = 2;
 struct MinimaxOutputInfo {
     score: HeuristicScore,
     num_leaves: u32,
-    moves: Vec<Option<BoardMove>>,
+    moves: Vec<BoardMove>,
 }
 
 fn to_score_and_moves(output: &MinimaxOutput) -> OrError<MinimaxOutputInfo> {
@@ -59,26 +59,24 @@ fn to_score_and_moves(output: &MinimaxOutput) -> OrError<MinimaxOutputInfo> {
     })
 }
 
-fn to_compressed_debug(board_move: &Option<BoardMove>) -> String {
+fn to_compressed_debug(board_move: &BoardMove) -> String {
     match board_move {
-        Some(board_move) => match board_move {
-            BoardMove::LongCastle(side) => format!("LongCastle: {:?}", side),
-            BoardMove::ShortCastle(side) => format!("ShortCastle: {:?}", side),
-            BoardMove::Normal {
-                piece: Piece { side, kind, state },
-                target,
-            } => {
-                if let PieceState::Stationary { position, .. } = state {
-                    format!(
-                        "side={:?}, kind={:?}, move=[{}, {}] -> [{}, {}]",
-                        side, kind, position.x, position.y, target.x, target.y
-                    )
-                } else {
-                    String::from("Unknown: Moving?")
-                }
+        BoardMove::None(side) => format!("None: {:?}", side),
+        BoardMove::LongCastle(side) => format!("LongCastle: {:?}", side),
+        BoardMove::ShortCastle(side) => format!("ShortCastle: {:?}", side),
+        BoardMove::Normal {
+            piece: Piece { side, kind, state },
+            target,
+        } => {
+            if let PieceState::Stationary { position, .. } = state {
+                format!(
+                    "side={:?}, kind={:?}, move=[{}, {}] -> [{}, {}]",
+                    side, kind, position.x, position.y, target.x, target.y
+                )
+            } else {
+                String::from("Unknown: Moving?")
             }
-        },
-        None => String::from("None"),
+        }
     }
 }
 
@@ -103,129 +101,187 @@ fn test_moves() {
         .map(|(_, num_leaves, _)| num_leaves)
         .sum::<u32>() as f32)
         / (BOARD_STATES.len() as f32);
-    expect!(average_leaves, "76047.836");
+    expect!(average_leaves, "417340.25");
     expect!(
         board_moves,
         r#"
         [
             (
-                -9.0,
-                48731,
+                -15.0,
+                2444574,
                 [
-                    "side=White, kind=Queen, move=[7, 2] -> [3, 6]",
-                    "side=Black, kind=Bishop, move=[5, 2] -> [6, 3]",
-                    "side=White, kind=Bishop, move=[7, 0] -> [1, 6]",
-                    "side=Black, kind=Bishop, move=[1, 5] -> [4, 2]",
-                ],
-            ),
-            (
-                4.0,
-                15221,
-                [
-                    "side=White, kind=Queen, move=[1, 3] -> [0, 2]",
-                    "side=Black, kind=Pawn, move=[2, 2] -> [1, 3]",
-                    "side=White, kind=Pawn, move=[4, 1] -> [4, 0]",
-                    "side=Black, kind=Queen, move=[3, 3] -> [5, 5]",
-                ],
-            ),
-            (
-                -14.0,
-                85765,
-                [
-                    "side=White, kind=Pawn, move=[2, 5] -> [1, 4]",
-                    "side=Black, kind=Bishop, move=[1, 5] -> [0, 4]",
-                    "side=White, kind=Pawn, move=[6, 5] -> [6, 4]",
-                    "side=Black, kind=Queen, move=[4, 3] -> [3, 2]",
-                ],
-            ),
-            (
-                21.0,
-                12001,
-                [
-                    "side=White, kind=King, move=[6, 2] -> [7, 2]",
-                    "None",
-                    "side=White, kind=Pawn, move=[1, 1] -> [1, 0]",
-                    "side=Black, kind=Bishop, move=[5, 2] -> [6, 3]",
+                    "side=White, kind=Queen, move=[7, 2] -> [5, 2]",
+                    "side=Black, kind=Bishop, move=[5, 2] -> [7, 0]",
+                    "side=White, kind=Bishop, move=[7, 0] -> [6, 1]",
+                    "side=Black, kind=Queen, move=[2, 0] -> [0, 0]",
+                    "None: White",
+                    "side=Black, kind=Pawn, move=[1, 6] -> [1, 7]",
+                    "None: White",
+                    "None: Black",
                 ],
             ),
             (
                 1.0,
-                92237,
+                47699,
                 [
-                    "side=White, kind=Rook, move=[7, 0] -> [0, 0]",
-                    "side=Black, kind=Queen, move=[0, 0] -> [4, 4]",
-                    "side=White, kind=Queen, move=[5, 4] -> [2, 7]",
-                    "side=Black, kind=King, move=[2, 6] -> [2, 5]",
+                    "side=White, kind=Queen, move=[1, 3] -> [1, 6]",
+                    "side=Black, kind=King, move=[3, 2] -> [4, 1]",
+                    "side=White, kind=Rook, move=[4, 6] -> [4, 7]",
+                    "side=Black, kind=Queen, move=[3, 3] -> [5, 5]",
+                    "side=White, kind=Pawn, move=[5, 5] -> [5, 4]",
+                    "None: Black",
+                    "None: White",
+                    "None: Black",
                 ],
             ),
             (
-                97.0,
-                36708,
+                -15.0,
+                130641,
                 [
-                    "side=White, kind=Bishop, move=[3, 3] -> [5, 5]",
-                    "side=Black, kind=King, move=[3, 4] -> [2, 5]",
-                    "side=White, kind=Bishop, move=[1, 4] -> [2, 5]",
-                    "side=Black, kind=Rook, move=[7, 7] -> [7, 4]",
+                    "side=White, kind=Pawn, move=[2, 5] -> [1, 4]",
+                    "side=Black, kind=Pawn, move=[1, 4] -> [2, 5]",
+                    "side=White, kind=Bishop, move=[4, 1] -> [7, 4]",
+                    "side=Black, kind=Queen, move=[4, 3] -> [4, 2]",
+                    "None: White",
+                    "None: Black",
+                    "None: White",
+                    "None: Black",
                 ],
             ),
             (
-                -10.0,
-                29558,
+                30.0,
+                70499,
                 [
-                    "side=White, kind=Rook, move=[2, 3] -> [4, 3]",
-                    "side=Black, kind=Pawn, move=[0, 5] -> [1, 6]",
-                    "side=White, kind=Pawn, move=[6, 3] -> [6, 2]",
-                    "side=Black, kind=Bishop, move=[7, 5] -> [5, 3]",
+                    "side=White, kind=Queen, move=[6, 3] -> [5, 4]",
+                    "side=Black, kind=Bishop, move=[5, 2] -> [3, 4]",
+                    "side=White, kind=Knight, move=[4, 4] -> [6, 5]",
+                    "side=Black, kind=King, move=[1, 5] -> [0, 4]",
+                    "side=White, kind=Pawn, move=[1, 1] -> [1, 0]",
+                    "None: Black",
+                    "None: White",
+                    "None: Black",
                 ],
             ),
             (
-                2.0,
-                89355,
+                -14.0,
+                1372548,
                 [
-                    "side=White, kind=Rook, move=[0, 5] -> [0, 6]",
-                    "side=Black, kind=King, move=[2, 1] -> [3, 2]",
-                    "side=White, kind=Knight, move=[2, 3] -> [4, 2]",
-                    "side=Black, kind=Pawn, move=[0, 2] -> [1, 3]",
-                ],
-            ),
-            (
-                -17.0,
-                72249,
-                [
-                    "None",
-                    "side=Black, kind=Rook, move=[3, 4] -> [3, 2]",
-                    "side=White, kind=Bishop, move=[7, 0] -> [1, 6]",
-                    "side=Black, kind=Pawn, move=[2, 6] -> [2, 7]",
-                ],
-            ),
-            (
-                -5.0,
-                42644,
-                [
-                    "side=White, kind=Rook, move=[1, 2] -> [1, 4]",
+                    "side=White, kind=King, move=[5, 2] -> [4, 1]",
                     "side=Black, kind=Knight, move=[4, 1] -> [2, 2]",
-                    "side=White, kind=Rook, move=[6, 7] -> [6, 6]",
-                    "side=Black, kind=Queen, move=[0, 5] -> [1, 6]",
+                    "side=White, kind=Pawn, move=[2, 5] -> [2, 4]",
+                    "side=Black, kind=Queen, move=[0, 0] -> [1, 1]",
+                    "None: White",
+                    "side=Black, kind=Pawn, move=[4, 6] -> [4, 7]",
+                    "None: White",
+                    "side=Black, kind=Pawn, move=[6, 6] -> [6, 7]",
+                    "None: White",
+                    "None: Black",
+                ],
+            ),
+            (
+                9.0,
+                412365,
+                [
+                    "side=White, kind=Knight, move=[5, 0] -> [3, 1]",
+                    "side=Black, kind=Bishop, move=[6, 1] -> [5, 0]",
+                    "side=White, kind=Pawn, move=[1, 1] -> [1, 0]",
+                    "side=Black, kind=Knight, move=[5, 7] -> [3, 6]",
+                    "side=White, kind=Bishop, move=[1, 4] -> [5, 0]",
+                    "side=Black, kind=Pawn, move=[4, 6] -> [4, 7]",
+                    "None: White",
+                    "None: Black",
+                    "None: White",
+                    "None: Black",
+                ],
+            ),
+            (
+                -8.0,
+                25566,
+                [
+                    "side=White, kind=Pawn, move=[1, 6] -> [0, 5]",
+                    "side=Black, kind=Pawn, move=[0, 5] -> [0, 6]",
+                    "side=White, kind=Pawn, move=[5, 2] -> [5, 1]",
+                    "side=Black, kind=Rook, move=[1, 0] -> [0, 0]",
+                    "None: White",
+                    "None: Black",
                 ],
             ),
             (
                 3.0,
-                14785,
+                65431,
                 [
-                    "side=White, kind=Queen, move=[0, 0] -> [3, 0]",
-                    "side=Black, kind=Queen, move=[1, 1] -> [2, 2]",
-                    "None",
-                    "side=Black, kind=Bishop, move=[3, 0] -> [4, 1]",
+                    "side=White, kind=Rook, move=[0, 5] -> [0, 6]",
+                    "side=Black, kind=Pawn, move=[0, 2] -> [1, 3]",
+                    "side=White, kind=Knight, move=[2, 3] -> [0, 2]",
+                    "side=Black, kind=King, move=[2, 1] -> [2, 2]",
+                    "None: White",
+                    "None: Black",
+                    "None: White",
+                    "None: Black",
                 ],
             ),
             (
-                0.0,
-                373320,
+                -20.0,
+                11263,
                 [
-                    "side=White, kind=King, move=[4, 6] -> [5, 7]",
-                    "side=Black, kind=King, move=[6, 5] -> [5, 4]",
-                    "side=White, kind=Pawn, move=[5, 2] -> [6, 1]",
-                    "side=Black, kind=Pawn, move=[3, 6] -> [4, 7]",
+                    "side=White, kind=Bishop, move=[7, 0] -> [6, 1]",
+                    "side=Black, kind=Rook, move=[3, 1] -> [2, 1]",
+                    "side=White, kind=Bishop, move=[6, 2] -> [5, 1]",
+                    "side=Black, kind=Bishop, move=[1, 3] -> [0, 2]",
+                    "None: White",
+                    "side=Black, kind=Pawn, move=[2, 6] -> [2, 7]",
+                    "None: White",
+                    "None: Black",
+                ],
+            ),
+            (
+                -7.0,
+                135819,
+                [
+                    "side=White, kind=Pawn, move=[3, 2] -> [4, 1]",
+                    "side=Black, kind=Knight, move=[4, 1] -> [6, 0]",
+                    "side=White, kind=Rook, move=[1, 2] -> [0, 2]",
+                    "side=Black, kind=Rook, move=[5, 6] -> [7, 6]",
+                    "side=White, kind=Bishop, move=[7, 6] -> [6, 5]",
+                    "side=Black, kind=Queen, move=[0, 5] -> [4, 1]",
+                    "None: White",
+                    "None: Black",
+                    "None: White",
+                    "None: Black",
+                ],
+            ),
+            (
+                3.0,
+                14999,
+                [
+                    "side=White, kind=Queen, move=[0, 0] -> [1, 1]",
+                    "side=Black, kind=Queen, move=[1, 1] -> [2, 2]",
+                    "side=White, kind=Pawn, move=[4, 3] -> [4, 2]",
+                    "side=Black, kind=Bishop, move=[3, 0] -> [4, 1]",
+                    "side=White, kind=Knight, move=[6, 0] -> [4, 1]",
+                    "None: Black",
+                    "None: White",
+                    "side=Black, kind=Knight, move=[6, 2] -> [4, 1]",
+                    "None: White",
+                    "None: Black",
+                ],
+            ),
+            (
+                4.0,
+                276679,
+                [
+                    "side=White, kind=Knight, move=[4, 7] -> [6, 6]",
+                    "side=Black, kind=Pawn, move=[6, 1] -> [5, 2]",
+                    "side=White, kind=King, move=[4, 6] -> [3, 6]",
+                    "side=Black, kind=Pawn, move=[3, 6] -> [3, 7]",
+                    "side=White, kind=Bishop, move=[5, 5] -> [3, 7]",
+                    "side=Black, kind=King, move=[6, 5] -> [6, 6]",
+                    "None: White",
+                    "None: Black",
+                    "None: White",
+                    "side=Black, kind=Rook, move=[0, 7] -> [3, 7]",
+                    "None: White",
+                    "None: Black",
                 ],
             ),
         ]"#

@@ -37,29 +37,30 @@ fn get_diff(board: &BoardState) -> f32 {
     let all_moves = board.get_all_possible_moves(Side::White);
     let random_move = all_moves.choose(&mut rand::thread_rng());
     let minimax_output = white_move(board, SEARCH_DEPTH, f32::NEG_INFINITY, f32::INFINITY);
+    let num_leaves = minimax_output.num_leaves();
+    println!("NUM LEAVES: {}", num_leaves); // TODO: remove
     let minimax_move = match minimax_output {
         MinimaxOutput::Node { best_move, .. } => best_move,
-        MinimaxOutput::Leaf { .. } => None,
+        MinimaxOutput::Leaf { .. } => BoardMove::None(Side::White),
     };
-    let random_score = get_score(board, random_move);
-    let minimax_score = get_score(board, minimax_move.as_ref());
+    let random_score = get_average_score(50000, board, random_move.unwrap());
+    let minimax_score = get_average_score(50000, board, &minimax_move);
     minimax_score - random_score
 }
 
-fn get_score(board: &BoardState, white_move: Option<&BoardMove>) -> f32 {
+fn get_average_score(n: u32, board: &BoardState, white_move: &BoardMove) -> f32 {
+    let mut total = 0f32;
+    for _ in 0..n {
+        total += get_score(board, white_move);
+    }
+    total / (n as f32)
+}
+
+fn get_score(board: &BoardState, white_move: &BoardMove) -> f32 {
     let mut board_mut = board.clone();
     let black_moves = board_mut.get_all_possible_moves(Side::Black);
-    let random_black_move = black_moves.choose(&mut rand::thread_rng());
-    if let Some(white_move) = white_move {
-        board_mut.apply_move(white_move);
-    }
-    if let Some(black_move) = random_black_move {
-        board_mut.apply_move(black_move)
-    }
-    // step until stationary
-    while !board_mut.is_all_pieces_stationary() {
-        board_mut.step();
-    }
+    let random_black_move = black_moves.choose(&mut rand::thread_rng()).unwrap();
+    board_mut.step(white_move, random_black_move);
     minimax::evaluate_material_heuristic(&board_mut)
 }
 
@@ -93,6 +94,9 @@ Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
     println!("scores={:?}", scores);
     let average = scores.iter().sum::<f32>() / scores.len() as f32;
     println!("avg={:?}", average);
+    unsafe {
+        println!("Q_COUNT={}, S_COUNT={}", Q_COUNT, S_COUNT);
+    }
 
     // let board = BoardState::parse_fen("3N4/b3P3/5p1B/2Q2bPP/PnK5/r5N1/7k/3r4").unwrap();
 
