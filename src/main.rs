@@ -100,25 +100,34 @@ fn single_sample(board: &BoardState) -> PyResult<f32> {
 }
 
 
-fn train_variation(initial_board: &BoardState) -> () {
+fn train_variation(initial_board: &BoardState, steps: u32) -> PyResult<f32> {
 
-    println!("train_variation");
+    let mut variation: Vec<[f32; 136]> = Vec::with_capacity(steps as usize + 1);
+    let board: BoardRepresentation = initial_board.clone().into();
+    let inital_float = board.to_float_array();
+    variation.push(inital_float);
     let mut board_mut = initial_board.clone();
-    let minimax_output = white_move(initial_board, SEARCH_DEPTH, f32::NEG_INFINITY, f32::INFINITY);
-    let minimax_move = match minimax_output {
-        MinimaxOutput::Node { best_move, .. } => best_move,
-        MinimaxOutput::Leaf { .. } => None,
-    };
-    let black_moves = board_mut.get_all_possible_moves(Side::Black);
-    let random_black_move = black_moves.choose(&mut rand::thread_rng()).unwrap();
-    board_mut.apply_move(&minimax_move.unwrap());
-    board_mut.apply_move(random_black_move);
-    board_mut.step();
 
-    let final_board = &board_mut;
+    for i in 0..steps {
+        let minimax_output = white_move(initial_board, SEARCH_DEPTH, f32::NEG_INFINITY, f32::INFINITY);
+        let minimax_move = match minimax_output {
+            MinimaxOutput::Node { best_move, .. } => best_move,
+            MinimaxOutput::Leaf { .. } => None,
+        };
+        let black_moves = board_mut.get_all_possible_moves(Side::Black);
+        let random_black_move = black_moves.choose(&mut rand::thread_rng()).unwrap();
+        board_mut.apply_move(&minimax_move.unwrap());
+        board_mut.apply_move(random_black_move);
 
-    let variation: [&BoardState; 2] = [initial_board, &final_board];
+        let new_board = board_mut.clone();
+        let board_rep: BoardRepresentation = new_board.into();
+        let float = board_rep.to_float_array();
+        variation.push(float);
+        board_mut.step();
+    }
 
+
+    /*
     let variation_arrays = variation
     .iter()
     .map(|state| {
@@ -126,8 +135,9 @@ fn train_variation(initial_board: &BoardState) -> () {
         representation.to_float_array()
     })
     .collect_vec();
+    */
 
-    // println!("variation: {:?}", variation);
+    let variation_arrays = variation;
     
     let model_file = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/model/model.py"));
 
@@ -153,7 +163,7 @@ fn train_variation(initial_board: &BoardState) -> () {
         Ok(result.extract::<f32>()?)
     });
 
-    println!("from_python: {:?}", from_python);
+    Ok(from_python?)
 }
 
 
@@ -194,7 +204,7 @@ Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
     
     let board = BoardState::parse_fen("2qn3B/P2k3p/5b1Q/8/8/Pb1r3P/1p5P/4K2R").unwrap();
 
-    let sample = train_variation(&board);
-    // println!("sample={:?}", sample);
+    let sample = train_variation(&board, 2);
+    println!("sample={:?}", sample);
     
 }

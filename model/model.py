@@ -76,14 +76,14 @@ class Model (nn.Module):
         # Variation is a list of board states as numpy arrays
 
         scores = list(map(self, variation))
-        print(scores)
+        # print(scores)
 
         loss = sum([abs(scores[-1] - score) * discount**i for i, score in enumerate(scores)])
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
-        return scores[-1]
+        return loss.item()
 
 
 
