@@ -66,6 +66,41 @@ fn get_score(board: &BoardState, white_move: Option<&BoardMove>) -> f32 {
     minimax::evaluate_material_heuristic(&board_mut)
 }
 
+
+fn single_sample(board: &BoardState) -> PyResult<f32> {
+
+    let model_file = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/model/model.py"));
+
+    let representation: BoardRepresentation = board.into();
+
+    let from_python: PyResult<f32> = Python::with_gil(|py| {
+        let np = py.import("numpy")?;
+        let locals = [("np", np)].into_py_dict(py);
+
+        let module = PyModule::from_code(py, model_file, "model.model", "model.model")?;
+
+
+        let gil = pyo3::Python::acquire_gil();
+        let pyarray = PyArray::from_vec(gil.python(), representation.to_float_array().to_vec());
+
+        
+        let model = module.getattr("Model")?;
+        let model_instance = model.call0()?;
+
+        let result = model_instance.call_method1("forward", (pyarray,)).unwrap();
+        //let result = model.call_method1("forward", (pyarray,))?;
+
+        // let instance = module.getattr("test")?;
+        // let result = instance.call_method1("testfunction", (pyarray,))?;
+        // Ok(result.extract::<f32>()?)
+        Ok(result.extract::<f32>()?)
+    });
+
+    Ok(from_python?)
+
+}
+
+
 fn main() {
     /*
     let fen_strings = r#"2qn3B/P2k3p/5b1Q/8/8/Pb1r3P/1p5P/4K2R
@@ -99,31 +134,15 @@ Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
     println!("avg={:?}", average);
     */
 
-    let x = vec![-1, -2, -3, 4, 5, 6, 7, 8, 9, 10];
-    let py_test = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/model/pytest.py"));
-    println!("{:?}", x);
+    let model_file = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/model/model.py"));
+    
+    let board = BoardState::parse_fen("8/8/8/8/2QQQ3/8/8/8").unwrap();
 
-    let from_python: PyResult<String> = Python::with_gil(|py| {
-        let np = py.import("numpy")?;
-        let locals = [("np", np)].into_py_dict(py);
+    let sample = single_sample(&board).unwrap();
+    println!("sample={:?}", sample);
+    
 
-        let module = PyModule::from_code(py, py_test, "model.pytest", "model.pytest")?;
-
-
-        let gil = pyo3::Python::acquire_gil();
-        let pyarray = PyArray::from_vec(gil.python(), x);
-
-        
-        /* // Make function call
-        let funct = module.getattr("test123")?;
-        let result = funct.call1((pyarray,))?;
-        */
-
-        // let instance = module.getattr("test")?;
-        // let result = instance.call_method1("testfunction", (pyarray,))?;
-        println!("result={:?}", result);
-        Ok(String::from(result.extract::<&str>()?))
-    });
+    // println!("from_python={:?}", from_python);
 
     /*
     Python::with_gil(|py| {
