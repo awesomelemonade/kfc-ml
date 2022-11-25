@@ -41,9 +41,28 @@ class Model (nn.Module):
 
         out = self.hidden_out(out1)
 
+        return out
+
+
+    def eval_single(self, x) :
+
+        x = torch.from_numpy(x).float()
+
+        out1 = self.hidden_pieces(x)
+        #out2 = self.hidden_material(x)
+        #out3 = self.hidden_board(x)
+
+        out1 = torch.relu(out1)
+        #out2 = torch.relu(out2)
+        #out3 = torch.relu(out3)
+
+        out = self.hidden_out(out1)
+
         return out.item()
 
+
     def train_single(self, x, y) :
+        # Must be supervised, no loss out of a single board state
 
         score = self(x)
         loss = score - y
@@ -53,22 +72,28 @@ class Model (nn.Module):
         return loss.item()
 
 
+    def train_variation(self, variation, discount=0.7) :
+        # Variation is a list of board states as numpy arrays
+
+        scores = list(map(self, variation))
+        print(scores)
+
+        loss = sum([abs(scores[-1] - score) * discount**i for i, score in enumerate(scores)])
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        return scores[-1]
+
+
+
     def save(self, path) :
         torch.save(self.state_dict(), path)
 
-        
-    def train(self, data, epochs=1, batch_size=1, lr=0.001) :
-        optimizer = optim.Adam(self.parameters(), lr=lr)
-        criterion = nn.MSELoss()
 
-        for epoch in range(epochs) :
-            for i in range(0, len(data), batch_size) :
-                batch = data[i:i+batch_size]
-                optimizer.zero_grad()
-                loss = criterion(self(batch), batch)
-                loss.backward()
-                optimizer.step()
-            print("Epoch: ", epoch, " Loss: ", loss.item())
+    def load(self, path) :
+        self.load_state_dict(torch.load(path))
+
 
 
 if __name__ == "__main__" :

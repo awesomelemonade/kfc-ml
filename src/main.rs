@@ -87,7 +87,7 @@ fn single_sample(board: &BoardState) -> PyResult<f32> {
         let model = module.getattr("Model")?;
         let model_instance = model.call0()?;
 
-        let result = model_instance.call_method1("forward", (pyarray,)).unwrap();
+        let result = model_instance.call_method1("eval_single", (pyarray,)).unwrap();
         //let result = model.call_method1("forward", (pyarray,))?;
 
         // let instance = module.getattr("test")?;
@@ -97,7 +97,63 @@ fn single_sample(board: &BoardState) -> PyResult<f32> {
     });
 
     Ok(from_python?)
+}
 
+
+fn train_variation(initial_board: &BoardState) -> () {
+
+    println!("train_variation");
+    let mut board_mut = initial_board.clone();
+    let minimax_output = white_move(initial_board, SEARCH_DEPTH, f32::NEG_INFINITY, f32::INFINITY);
+    let minimax_move = match minimax_output {
+        MinimaxOutput::Node { best_move, .. } => best_move,
+        MinimaxOutput::Leaf { .. } => None,
+    };
+    let black_moves = board_mut.get_all_possible_moves(Side::Black);
+    let random_black_move = black_moves.choose(&mut rand::thread_rng()).unwrap();
+    board_mut.apply_move(&minimax_move.unwrap());
+    board_mut.apply_move(random_black_move);
+    board_mut.step();
+
+    let final_board = &board_mut;
+
+    let variation: [&BoardState; 2] = [initial_board, &final_board];
+
+    let variation_arrays = variation
+    .iter()
+    .map(|state| {
+        let representation: BoardRepresentation = (*state).into();
+        representation.to_float_array()
+    })
+    .collect_vec();
+
+    // println!("variation: {:?}", variation);
+    
+    let model_file = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/model/model.py"));
+
+    let from_python: PyResult<f32> = Python::with_gil(|py| {
+        let np = py.import("numpy")?;
+        let locals = [("np", np)].into_py_dict(py);
+
+        let module = PyModule::from_code(py, model_file, "model.model", "model.model")?;
+
+
+        let gil = pyo3::Python::acquire_gil();
+        let pyarrays = variation_arrays.iter().map(|array| PyArray::from_vec(gil.python(), array.to_vec())).collect_vec();
+        
+        let model = module.getattr("Model")?;
+        let model_instance = model.call0()?;
+
+        let result = model_instance.call_method1("train_variation", (pyarrays,)).unwrap();
+        //let result = model.call_method1("forward", (pyarray,))?;
+
+        // let instance = module.getattr("test")?;
+        // let result = instance.call_method1("testfunction", (pyarray,))?;
+        // Ok(result.extract::<f32>()?)
+        Ok(result.extract::<f32>()?)
+    });
+
+    println!("from_python: {:?}", from_python);
 }
 
 
@@ -136,61 +192,9 @@ Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
 
     let model_file = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/model/model.py"));
     
-    let board = BoardState::parse_fen("8/8/8/8/2QQQ3/8/8/8").unwrap();
+    let board = BoardState::parse_fen("2qn3B/P2k3p/5b1Q/8/8/Pb1r3P/1p5P/4K2R").unwrap();
 
-    let sample = single_sample(&board).unwrap();
-    println!("sample={:?}", sample);
+    let sample = train_variation(&board);
+    // println!("sample={:?}", sample);
     
-
-    // println!("from_python={:?}", from_python);
-
-    /*
-    Python::with_gil(|py| {
-        let np = py.import("numpy")?;
-        let locals = [("np", np)].into_py_dict(py);
-
-        let gil = pyo3::Python::acquire_gil();
-        let pyarray = PyArray::from_vec(gil.python(), x);
-
-
-        let readonly = pyarray.readonly();
-        let slice = readonly.as_slice()?;
-        assert_eq!(slice, &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-
-        Ok(())
-    })
-    */
-
-    // let board = BoardState::parse_fen("3N4/b3P3/5p1B/2Q2bPP/PnK5/r5N1/7k/3r4").unwrap();
-
-    // let score = white_move(&board, 0);
-    // println!("score={:?}", score);
-
-    //     let result = Python::with_gil(|py| {
-    //         let activators = PyModule::from_code(
-    //             py,
-    //             r#"
-    // import numpy as np
-
-    // def relu(x):
-    //     return max(0.0, x)
-    // def leaky_relu(x, slope=0.01):
-    //     return x if x >= 0 else x * slope
-    //         "#,
-    //             "activators.py",
-    //             "activators",
-    //         )?;
-
-    //         let relu_result: f64 = activators.getattr("relu")?.call1((-1.0,))?.extract()?;
-    //         assert_eq!(relu_result, 0.0);
-
-    //         let kwargs = [("slope", 0.2)].into_py_dict(py);
-    //         let lrelu_result: f64 = activators
-    //             .getattr("leaky_relu")?
-    //             .call((-1.0,), Some(kwargs))?
-    //             .extract()?;
-    //         assert_eq!(lrelu_result, -0.2);
-    //         PyResult::Ok(())
-    //     });
-    //     println!("Result: {:?}", result);
 }
