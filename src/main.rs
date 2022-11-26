@@ -24,6 +24,8 @@ pub use minimax::*;
 mod board_representation;
 pub use board_representation::*;
 
+pub mod util;
+
 use itertools::Itertools;
 
 use numpy::{Ix1, PyArray};
@@ -100,7 +102,8 @@ Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
 }
 
 fn main() -> OrError<()> {
-    let board = BoardState::parse_fen("3N4/b3P3/5p1B/2Q2bPP/PnK5/r5N1/7k/3r4").unwrap();
+    let board =
+        BoardState::parse_fen("2r2rk1/pp3pp1/b2Pp3/P1Q4p/RPqN2n1/8/2P2PPP/2B1R1K1").unwrap();
     let minimax_output: MinimaxOutputInfo = search_white(&board, SEARCH_DEPTH)?;
     let representations = minimax_output
         .to_representations()
