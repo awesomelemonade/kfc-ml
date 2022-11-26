@@ -177,7 +177,7 @@ impl Default for BoardRepresentationSide {
 #[derive(Debug, Clone, Copy)]
 enum BoardRepresentationPiece {
     Stationary { x: f32, y: f32, cooldown: f32 },
-    Moving { x: f32, y: f32 },
+    Moving { x: f32, y: f32, vx: f32, vy: f32 },
     Missing,
 }
 
@@ -189,7 +189,13 @@ impl From<PieceState> for BoardRepresentationPiece {
                 y: position.y as f32,
                 cooldown: cooldown as f32,
             },
-            PieceState::Moving { x, y, .. } => BoardRepresentationPiece::Moving { x, y },
+            PieceState::Moving {
+                x,
+                y,
+                target: MoveTarget {
+                    velocity: (vx, vy), ..
+                },
+            } => BoardRepresentationPiece::Moving { x, y, vx, vy },
         }
     }
 }
@@ -201,23 +207,29 @@ impl BoardRepresentationPiece {
                 array[0] = 0f32;
                 array[1] = 0f32;
                 array[2] = 0f32;
-                array[3] = 0f32;
+                array[3] = PIECE_COOLDOWN as f32;
+                array[4] = 0f32;
+                array[5] = 0f32;
             }
             BoardRepresentationPiece::Stationary { x, y, cooldown } => {
                 array[0] = 1f32;
                 array[1] = *x;
                 array[2] = *y;
                 array[3] = *cooldown;
+                array[4] = 0f32;
+                array[5] = 0f32;
             }
-            BoardRepresentationPiece::Moving { x, y } => {
+            BoardRepresentationPiece::Moving { x, y, vx, vy } => {
                 array[0] = 2f32;
                 array[1] = *x;
                 array[2] = *y;
-                array[3] = 10f32; // moving pieces will have big cooldown
+                array[3] = PIECE_COOLDOWN as f32; // moving pieces will have big cooldown
+                array[4] = *vx;
+                array[5] = *vy;
             }
         }
     }
     const fn num_floats() -> usize {
-        4
+        6
     }
 }
