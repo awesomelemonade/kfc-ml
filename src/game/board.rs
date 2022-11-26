@@ -354,6 +354,8 @@ impl BoardState {
         unsafe {
             S_COUNT += 1;
         }
+        debug_assert!(white_move.side() == Side::White);
+        debug_assert!(black_move.side() == Side::Black);
         self.apply_move(white_move);
         self.apply_move(black_move);
         fn position_after_step(piece_state: &PieceState) -> (f32, f32) {
@@ -886,6 +888,17 @@ pub enum BoardMove {
     LongCastle(Side),
     ShortCastle(Side),
     Normal { piece: Piece, target: Position }, // TODO-someday: PieceState should always be stationary here - represent this differently?
+}
+
+impl BoardMove {
+    pub fn side(&self) -> Side {
+        match self {
+            BoardMove::None(side) => *side,
+            BoardMove::LongCastle(side) => *side,
+            BoardMove::ShortCastle(side) => *side,
+            BoardMove::Normal { piece, .. } => piece.side,
+        }
+    }
 }
 
 struct MoveGenerator<'a> {

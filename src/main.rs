@@ -15,6 +15,7 @@ core!();
 mod imports;
 
 mod game;
+
 pub use game::*;
 
 mod minimax;
@@ -25,27 +26,25 @@ pub use board_representation::*;
 
 use itertools::Itertools;
 
-// use pyo3::{
-//     prelude::*,
-//     types::{IntoPyDict, PyModule},
-// };
+use numpy::{Ix1, PyArray};
+use pyo3::{prelude::*, types::PyModule};
 use rand::seq::SliceRandom;
 
 const SEARCH_DEPTH: u32 = 2;
 
-fn get_diff(board: &BoardState) -> f32 {
+fn get_diff(board: &BoardState) -> OrError<f32> {
     let all_moves = board.get_all_possible_moves(Side::White);
     let random_move = all_moves.choose(&mut rand::thread_rng());
-    let minimax_output = white_move(board, SEARCH_DEPTH, f32::NEG_INFINITY, f32::INFINITY);
-    let num_leaves = minimax_output.num_leaves();
+    let minimax_output = search_white(board, SEARCH_DEPTH)?;
+    let num_leaves = minimax_output.num_leaves;
     println!("NUM LEAVES: {}", num_leaves); // TODO: remove
-    let minimax_move = match minimax_output {
-        MinimaxOutput::Node { best_move, .. } => best_move,
-        MinimaxOutput::Leaf { .. } => BoardMove::None(Side::White),
-    };
+    let minimax_move = minimax_output
+        .moves
+        .first()
+        .unwrap_or(&BoardMove::None(Side::White));
     let random_score = get_average_score(50000, board, random_move.unwrap());
     let minimax_score = get_average_score(50000, board, &minimax_move);
-    minimax_score - random_score
+    Ok(minimax_score - random_score)
 }
 
 fn get_average_score(n: u32, board: &BoardState, white_move: &BoardMove) -> f32 {
@@ -64,7 +63,7 @@ fn get_score(board: &BoardState, white_move: &BoardMove) -> f32 {
     minimax::evaluate_material_heuristic(&board_mut)
 }
 
-fn main() {
+fn run_analysis() {
     let fen_strings = r#"2qn3B/P2k3p/5b1Q/8/8/Pb1r3P/1p5P/4K2R
 6n1/4P1B1/1Npkp1Pp/1Q1q4/8/2r2P2/4RK2/4n3
 r7/4B3/4P1p1/2P1q3/1p3n2/1bPn2PP/6N1/1k3K2
@@ -87,47 +86,44 @@ Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
             let representation: BoardRepresentation = state.into();
             representation.to_float_array()
         })
-        .collect_vec(); // TODO: map to numpy array
+        .collect_vec();
     println!("{:?}", floats);
 
-    let scores = board_states.iter().map(get_diff).collect_vec();
+    let scores: OrError<Vec<_>> = board_states.iter().map(get_diff).collect();
     println!("scores={:?}", scores);
+    let scores = scores.unwrap();
     let average = scores.iter().sum::<f32>() / scores.len() as f32;
     println!("avg={:?}", average);
     unsafe {
         println!("Q_COUNT={}, S_COUNT={}", Q_COUNT, S_COUNT);
     }
+}
 
-    // let board = BoardState::parse_fen("3N4/b3P3/5p1B/2Q2bPP/PnK5/r5N1/7k/3r4").unwrap();
-
-    // let score = white_move(&board, 0);
-    // println!("score={:?}", score);
-
-    //     let result = Python::with_gil(|py| {
-    //         let activators = PyModule::from_code(
-    //             py,
-    //             r#"
-    // import numpy as np
-
-    // def relu(x):
-    //     return max(0.0, x)
-    // def leaky_relu(x, slope=0.01):
-    //     return x if x >= 0 else x * slope
-    //         "#,
-    //             "activators.py",
-    //             "activators",
-    //         )?;
-
-    //         let relu_result: f64 = activators.getattr("relu")?.call1((-1.0,))?.extract()?;
-    //         assert_eq!(relu_result, 0.0);
-
-    //         let kwargs = [("slope", 0.2)].into_py_dict(py);
-    //         let lrelu_result: f64 = activators
-    //             .getattr("leaky_relu")?
-    //             .call((-1.0,), Some(kwargs))?
-    //             .extract()?;
-    //         assert_eq!(lrelu_result, -0.2);
-    //         PyResult::Ok(())
-    //     });
-    //     println!("Result: {:?}", result);
+fn main() -> OrError<()> {
+    let board = BoardState::parse_fen("3N4/b3P3/5p1B/2Q2bPP/PnK5/r5N1/7k/3r4").unwrap();
+    let minimax_output: MinimaxOutputInfo = search_white(&board, SEARCH_DEPTH)?;
+    let representations = minimax_output
+        .to_representations()
+        .iter()
+        .map(|x| x.to_float_array().to_vec())
+        .collect_vec();
+    let code = include_str!("./model.py");
+    let result: PyResult<_> = Python::with_gil(|py| {
+        let module = PyModule::from_code(py, code, "model", "model")?;
+        let py_arrays = representations
+            .into_iter()
+            .map(|rep| PyArray::from_vec(py, rep))
+            .collect_vec();
+        let py_func = module.getattr("test_function")?;
+        let result = py_func.call1((py_arrays,))?;
+        let extracted = result.extract::<Vec<&PyArray<f32, Ix1>>>()?;
+        let extracted_vec = extracted.iter().map(|a| a.to_vec().unwrap()).collect_vec();
+        Ok(extracted_vec)
+    });
+    println!("RESULT: {:?}", result);
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|arg| arg == "analyze") {
+        run_analysis();
+    }
+    Ok(())
 }

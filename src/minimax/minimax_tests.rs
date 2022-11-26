@@ -27,38 +27,6 @@ Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
 
 const SEARCH_DEPTH: u32 = 2;
 
-// TODO: may want to minimax itself
-struct MinimaxOutputInfo {
-    score: HeuristicScore,
-    num_leaves: u32,
-    moves: Vec<BoardMove>,
-}
-
-fn to_score_and_moves(output: &MinimaxOutput) -> OrError<MinimaxOutputInfo> {
-    let score = output.score();
-    let mut moves = Vec::new();
-
-    let mut current = output;
-    while let MinimaxOutput::Node {
-        best_move,
-        best_score,
-        next,
-        ..
-    } = current
-    {
-        if *best_score != score {
-            return Err(Error!("Scores do not match"));
-        }
-        moves.push(best_move.clone());
-        current = next;
-    }
-    Ok(MinimaxOutputInfo {
-        score,
-        num_leaves: output.num_leaves(),
-        moves,
-    })
-}
-
 fn to_compressed_debug(board_move: &BoardMove) -> String {
     match board_move {
         BoardMove::None(side) => format!("None: {:?}", side),
@@ -85,12 +53,12 @@ fn test_moves() {
     let board_moves: OrError<Vec<_>> = BOARD_STATES
         .iter()
         .map(|state| {
-            let output = white_move(state, SEARCH_DEPTH, f32::NEG_INFINITY, f32::INFINITY);
             let MinimaxOutputInfo {
                 score,
                 num_leaves,
                 moves,
-            } = to_score_and_moves(&output)?;
+                ..
+            } = search_white(state, SEARCH_DEPTH).unwrap();
             let moves = moves.iter().map(to_compressed_debug).collect_vec();
             Ok((score, num_leaves, moves))
         })

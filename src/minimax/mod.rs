@@ -38,6 +38,74 @@ pub fn evaluate_material_heuristic(state: &BoardState) -> HeuristicScore {
     material_value as f32
 }
 
+pub struct MinimaxOutputInfo {
+    pub board: BoardState,
+    pub search_depth: u32,
+    pub score: HeuristicScore,
+    pub num_leaves: u32,
+    pub moves: Vec<BoardMove>,
+}
+
+impl MinimaxOutputInfo {
+    // TODO-someday: assumes white first when it probably shouldn't
+    pub fn iter_states<F>(&self, mut f: F)
+    where
+        F: FnMut(&BoardState),
+    {
+        let mut board = self.board.clone();
+        f(&board);
+        self.moves
+            .chunks(2)
+            .take(self.search_depth as usize)
+            .for_each(|chunk| match chunk {
+                [white_move, black_move] => {
+                    board.step(white_move, black_move);
+                    f(&board);
+                }
+                _ => {
+                    panic!();
+                }
+            });
+    }
+    pub fn to_representations(&self) -> Vec<BoardRepresentation> {
+        let mut representations = Vec::new();
+        self.iter_states(|state| {
+            representations.push(state.into());
+        });
+        representations
+    }
+    fn try_from(
+        output: &MinimaxOutput,
+        board: BoardState,
+        search_depth: u32,
+    ) -> OrError<MinimaxOutputInfo> {
+        let score = output.score();
+        let mut moves = Vec::new();
+
+        let mut current = output;
+        while let MinimaxOutput::Node {
+            best_move,
+            best_score,
+            next,
+            ..
+        } = current
+        {
+            if *best_score != score {
+                return Err(Error!("Scores do not match"));
+            }
+            moves.push(best_move.clone());
+            current = next;
+        }
+        Ok(MinimaxOutputInfo {
+            score,
+            num_leaves: output.num_leaves(),
+            moves,
+            board,
+            search_depth,
+        })
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum MinimaxOutput {
     Node {
@@ -67,7 +135,12 @@ impl MinimaxOutput {
     }
 }
 
-pub fn white_move(
+pub fn search_white(board: &BoardState, depth: u32) -> OrError<MinimaxOutputInfo> {
+    let output = white_move(board, depth, f32::NEG_INFINITY, f32::INFINITY);
+    MinimaxOutputInfo::try_from(&output, board.clone(), depth)
+}
+
+fn white_move(
     state: &BoardState,
     depth: u32,
     mut alpha: HeuristicScore,
@@ -109,7 +182,7 @@ pub fn white_move(
     }
 }
 
-pub fn black_move(
+fn black_move(
     state: &BoardState,
     depth: u32,
     alpha: HeuristicScore,
