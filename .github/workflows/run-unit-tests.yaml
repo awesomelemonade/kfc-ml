@@ -49,7 +49,7 @@ jobs:
       - run: sudo sh -c " echo 0 > /proc/sys/kernel/kptr_restrict"
       - name: Perf version
         run: perf --version
-      - run: perf record --call-graph dwarf -o perf.data ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
+      - run: perf record -g --call-graph dwarf -o perf.data ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
       - name: Archive perf
         uses: actions/upload-artifact@v2
         with:
