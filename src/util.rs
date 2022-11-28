@@ -1,5 +1,26 @@
 use std::{cmp::Ordering, mem};
 
+use pyo3::{PyResult, Python};
+
+pub trait UnwrapWithTraceback<T> {
+    fn unwrap_with_traceback(self, py: Python) -> T;
+}
+
+impl<T> UnwrapWithTraceback<T> for PyResult<T> {
+    // panics with traceback
+    fn unwrap_with_traceback(self, py: Python) -> T {
+        match self {
+            Ok(t) => t,
+            Err(error) => {
+                if let Some(traceback) = error.traceback(py) {
+                    println!("Traceback:\n{}", traceback.format().unwrap());
+                }
+                panic!("Unwrap error: {}\n", error);
+            }
+        }
+    }
+}
+
 // throws if there are any NaNs
 pub fn sort_by_cached_f32_exn<T, F>(vec: &mut Vec<T>, f: F)
 where
@@ -65,3 +86,5 @@ where
     }
     sort_by_key!(usize, vec, f, comparator)
 }
+
+// TODO: tests for all these util functions

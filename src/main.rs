@@ -29,11 +29,14 @@ mod sequential;
 
 use itertools::Itertools;
 
-use numpy::ndarray::{Array1, Axis};
+use numpy::{
+    ndarray::{Array1, Axis},
+    PyArray1,
+};
 use pyo3::{prelude::*, types::PyModule};
 use rand::seq::SliceRandom;
 
-use crate::sequential::SequentialModel;
+use crate::{sequential::SequentialModel, util::UnwrapWithTraceback};
 
 const SEARCH_DEPTH: u32 = 2;
 
@@ -114,7 +117,7 @@ fn main() -> OrError<()> {
         .map(|x| Array1::from_vec(x.to_float_array().to_vec()))
         .collect_vec();
     let views = representations.iter().map(|x| x.view()).collect_vec();
-    let representations = numpy::ndarray::stack(Axis(1), &views[..])
+    let stacked_views = numpy::ndarray::stack(Axis(1), &views[..])
         .map_err(|e| Error!("Error creating representations: {}", e))?;
     let code = include_str!("./model.py");
     let result: PyResult<_> = Python::with_gil(|py| {
@@ -123,15 +126,27 @@ fn main() -> OrError<()> {
         println!("Creating Model");
         let model = module.getattr("Model")?;
         let model_instance = model.call0()?;
+
+        println!("Attempting to learn");
+        let representations = representations
+            .into_iter()
+            .map(|x| PyArray1::from_vec(py, x.to_vec()))
+            .collect_vec();
+
+        for _ in 0..500 {
+            let loss = model_instance.call_method1("learn", (representations.clone(),));
+            let loss = loss.unwrap_with_traceback(py);
+            println!("Loss: {:?}", loss);
+        }
+
         println!("Fetching Layers");
-        let sequential = model_instance.call_method0("model_layers")?;
+        let sequential = model_instance.call_method0("model_layer_weights")?;
         println!("Extracting Layers");
         let extracted = SequentialModel::new_from_python(sequential).unwrap();
         Ok(extracted)
     });
     let sequential = result.map_err(|e| Error!("Unable to fetch model: {}", e))?;
-    println!("dim: {:?}", representations.dim());
-    let forwarded = sequential.forward(representations);
+    let forwarded = sequential.forward(stacked_views);
     println!("FORWARDED: {:?}", forwarded);
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|arg| arg == "analyze") {

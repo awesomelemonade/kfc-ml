@@ -131,3 +131,5 @@ impl Layer {
 // test_new_invalid_last_layer_sequential_model - output dimension of the last layer is not 1
 // test_forward
 // test_forward_one
+// test_forward_relu_layer
+// test_forward_linear_layer
