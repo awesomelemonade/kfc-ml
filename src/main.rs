@@ -51,7 +51,7 @@ fn get_diff(board: &BoardState) -> OrError<f32> {
         .first()
         .unwrap_or(&BoardMove::None(Side::White));
     let random_score = get_average_score(50000, board, random_move.unwrap());
-    let minimax_score = get_average_score(50000, board, &minimax_move);
+    let minimax_score = get_average_score(50000, board, minimax_move);
     Ok(minimax_score - random_score)
 }
 
