@@ -28,7 +28,7 @@ impl BoardRepresentation {
         }
     }
 
-    const fn num_floats() -> usize {
+    pub const fn num_floats() -> usize {
         BoardRepresentationSide::num_floats() * 2
     }
 

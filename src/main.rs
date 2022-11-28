@@ -15,7 +15,6 @@ core!();
 mod imports;
 
 mod game;
-
 pub use game::*;
 
 mod minimax;
@@ -26,11 +25,15 @@ pub use board_representation::*;
 
 pub mod util;
 
+mod sequential;
+
 use itertools::Itertools;
 
-use numpy::{Ix1, PyArray};
+use numpy::ndarray::{Array1, Axis};
 use pyo3::{prelude::*, types::PyModule};
 use rand::seq::SliceRandom;
+
+use crate::sequential::SequentialModel;
 
 const SEARCH_DEPTH: u32 = 2;
 
@@ -108,22 +111,28 @@ fn main() -> OrError<()> {
     let representations = minimax_output
         .to_representations()
         .iter()
-        .map(|x| x.to_float_array().to_vec())
+        .map(|x| Array1::from_vec(x.to_float_array().to_vec()))
         .collect_vec();
+    let views = representations.iter().map(|x| x.view()).collect_vec();
+    let representations = numpy::ndarray::stack(Axis(1), &views[..])
+        .map_err(|e| Error!("Error creating representations: {}", e))?;
     let code = include_str!("./model.py");
     let result: PyResult<_> = Python::with_gil(|py| {
+        println!("Importing Python Code");
         let module = PyModule::from_code(py, code, "model", "model")?;
-        let py_arrays = representations
-            .into_iter()
-            .map(|rep| PyArray::from_vec(py, rep))
-            .collect_vec();
-        let py_func = module.getattr("test_function")?;
-        let result = py_func.call1((py_arrays,))?;
-        let extracted = result.extract::<Vec<&PyArray<f32, Ix1>>>()?;
-        let extracted_vec = extracted.iter().map(|a| a.to_vec().unwrap()).collect_vec();
-        Ok(extracted_vec)
+        println!("Creating Model");
+        let model = module.getattr("Model")?;
+        let model_instance = model.call0()?;
+        println!("Fetching Layers");
+        let sequential = model_instance.call_method0("model_layers")?;
+        println!("Extracting Layers");
+        let extracted = SequentialModel::new_from_python(sequential).unwrap();
+        Ok(extracted)
     });
-    println!("RESULT: {:?}", result);
+    let sequential = result.map_err(|e| Error!("Unable to fetch model: {}", e))?;
+    println!("dim: {:?}", representations.dim());
+    let forwarded = sequential.forward(representations);
+    println!("FORWARDED: {:?}", forwarded);
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|arg| arg == "analyze") {
         run_analysis();
