@@ -1,5 +1,7 @@
 core!();
 
+use std::cmp::Ordering;
+
 use crate::*;
 use enum_map::{enum_map, EnumMap};
 
@@ -36,6 +38,55 @@ pub fn evaluate_material_heuristic(state: &BoardState) -> HeuristicScore {
         })
         .sum();
     material_value as f32
+}
+
+pub fn get_board_end_state(state: &BoardState) -> Option<EndState> {
+    // if there are only 2 kings (and both with 0 cooldown), it's a draw
+    // if one side is missing a king, the other is the winner
+    // if both sides are missing a king, it's a draw (i.e. both somehow captured at the same time)
+
+    // we could also do other heuristics, but the model would not know how to play them
+    // if we put it as an end state (ex: K + R vs K is almost always a win)
+
+    let white_king = state
+        .pieces()
+        .iter()
+        .find(|p| p.kind == PieceKind::King && p.side == Side::White);
+    let black_king = state
+        .pieces()
+        .iter()
+        .find(|p| p.kind == PieceKind::King && p.side == Side::Black);
+    match (white_king, black_king) {
+        (None, None) => Some(EndState::Draw),
+        (None, Some(_)) => Some(EndState::Winner(Side::Black)),
+        (Some(_), None) => Some(EndState::Winner(Side::White)),
+        (Some(white_king), Some(black_king)) => {
+            if state.pieces().len() == 2 {
+                if let PieceState::Stationary { position: white_position, cooldown: white_cooldown } = white_king.state &&
+                    let PieceState::Stationary { position: black_position, cooldown: black_cooldown } = black_king.state {
+                    let distance = (white_position - black_position).dist_linf();
+                    if distance <= 1 {
+                        match white_cooldown.cmp(&black_cooldown) {
+                            Ordering::Less => Some(EndState::Winner(Side::White)),
+                            Ordering::Equal => Some(EndState::Draw),
+                            Ordering::Greater => Some(EndState::Winner(Side::White)),
+                        }
+                    } else {
+                        Some(EndState::Draw)
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
+    }
+}
+
+pub enum EndState {
+    Winner(Side),
+    Draw,
 }
 
 pub struct MinimaxOutputInfo {

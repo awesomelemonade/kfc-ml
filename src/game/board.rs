@@ -5,6 +5,7 @@ use core::slice;
 use super::*;
 use enum_map::EnumMap;
 use itertools::Itertools;
+use rand::{seq::SliceRandom, Rng};
 
 #[derive(Debug, Clone)]
 pub struct BoardState {
@@ -879,6 +880,75 @@ impl BoardState {
                 } => destination == target,
             }
         })
+    }
+    pub fn generate_random_board_with(num_pieces_per_side: usize) -> Self {
+        let distribution = "PPPPPPPPNNBBRRQ"
+            .chars()
+            .map(|c| PieceKind::from_char(c).unwrap())
+            .collect_vec();
+        debug_assert!(num_pieces_per_side >= 1); // requires king
+        debug_assert!(num_pieces_per_side <= distribution.len());
+
+        let white_pieces = distribution
+            .choose_multiple(&mut rand::thread_rng(), num_pieces_per_side - 1)
+            .chain(std::iter::once(&PieceKind::King))
+            .map(|kind| (Side::White, kind.clone()));
+        let black_pieces = distribution
+            .choose_multiple(&mut rand::thread_rng(), num_pieces_per_side - 1)
+            .chain(std::iter::once(&PieceKind::King))
+            .map(|kind| (Side::Black, kind.clone()));
+        let pieces = white_pieces.chain(black_pieces).collect_vec();
+        Self::generate_random_board(pieces)
+    }
+    // TODO-someday: maybe put some rules that will generate reasonable boards
+    pub fn generate_random_board(pieces: impl IntoIterator<Item = (Side, PieceKind)>) -> Self {
+        fn random_position() -> Position {
+            let x = rand::thread_rng().gen_range(0..BOARD_SIZE) as u32;
+            let y = rand::thread_rng().gen_range(0..BOARD_SIZE) as u32;
+            Position { x, y }
+        }
+        fn random_with_reqs<F>(f: F) -> Position
+        where
+            F: Fn(&Position) -> bool,
+        {
+            loop {
+                let position = random_position();
+                if f(&position) {
+                    return position;
+                }
+            }
+        }
+        let mut pieces_vec = Vec::new();
+        let mut occupied = [[false; BOARD_SIZE]; BOARD_SIZE];
+
+        fn add_piece(
+            pieces: &mut Vec<Piece>,
+            occupied: &mut [[bool; BOARD_SIZE]; BOARD_SIZE],
+            side: Side,
+            kind: PieceKind,
+        ) {
+            let position = match kind {
+                PieceKind::Pawn => random_with_reqs(|pos| {
+                    pos.y != 0
+                        && pos.y != BOARD_SIZE as u32 - 1
+                        && !occupied[pos.x as usize][pos.y as usize]
+                }),
+                _ => random_with_reqs(|pos| !occupied[pos.x as usize][pos.y as usize]),
+            };
+            occupied[position.x as usize][position.y as usize] = true;
+            pieces.push(Piece {
+                side,
+                kind,
+                state: PieceState::Stationary {
+                    position,
+                    cooldown: 0,
+                },
+            });
+        }
+        for (side, kind) in pieces {
+            add_piece(&mut pieces_vec, &mut occupied, side, kind);
+        }
+        Self::new_with_castling(pieces_vec, false)
     }
 }
 

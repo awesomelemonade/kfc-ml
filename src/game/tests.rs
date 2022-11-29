@@ -408,3 +408,11 @@ fn test_quiescent_prioritize_taking_queen() {
         ]"#
     );
 }
+
+// TODO-someday: need to extract the rng out so this test is repeatable
+// #[test]
+// fn test_generate_random_board_with() {
+//     let board = BoardState::generate_random_board_with(10);
+//     println!("{}", board.to_stationary_map_combo());
+//     expect!(board.to_stationary_map_combo());
+// }
