@@ -69,14 +69,14 @@ fn test_moves() {
         .map(|(_, num_leaves, _)| num_leaves)
         .sum::<u32>() as f32)
         / (BOARD_STATES.len() as f32);
-    expect!(average_leaves, "417340.25");
+    expect!(average_leaves, "413736.4");
     expect!(
         board_moves,
         r#"
         [
             (
                 -15.0,
-                2444574,
+                2434016,
                 [
                     "side=White, kind=Queen, move=[7, 2] -> [5, 2]",
                     "side=Black, kind=Bishop, move=[5, 2] -> [7, 0]",
@@ -90,7 +90,7 @@ fn test_moves() {
             ),
             (
                 1.0,
-                47699,
+                47769,
                 [
                     "side=White, kind=Queen, move=[1, 3] -> [1, 6]",
                     "side=Black, kind=King, move=[3, 2] -> [4, 1]",
@@ -104,7 +104,7 @@ fn test_moves() {
             ),
             (
                 -15.0,
-                130641,
+                130616,
                 [
                     "side=White, kind=Pawn, move=[2, 5] -> [1, 4]",
                     "side=Black, kind=Pawn, move=[1, 4] -> [2, 5]",
@@ -118,7 +118,7 @@ fn test_moves() {
             ),
             (
                 30.0,
-                70499,
+                70561,
                 [
                     "side=White, kind=Queen, move=[6, 3] -> [5, 4]",
                     "side=Black, kind=Bishop, move=[5, 2] -> [3, 4]",
@@ -132,7 +132,7 @@ fn test_moves() {
             ),
             (
                 -14.0,
-                1372548,
+                1371847,
                 [
                     "side=White, kind=King, move=[5, 2] -> [4, 1]",
                     "side=Black, kind=Knight, move=[4, 1] -> [2, 2]",
@@ -148,7 +148,7 @@ fn test_moves() {
             ),
             (
                 9.0,
-                412365,
+                389308,
                 [
                     "side=White, kind=Knight, move=[5, 0] -> [3, 1]",
                     "side=Black, kind=Bishop, move=[6, 1] -> [5, 0]",
@@ -204,7 +204,7 @@ fn test_moves() {
             ),
             (
                 -7.0,
-                135819,
+                134763,
                 [
                     "side=White, kind=Pawn, move=[3, 2] -> [4, 1]",
                     "side=Black, kind=Knight, move=[4, 1] -> [6, 0]",
@@ -236,7 +236,7 @@ fn test_moves() {
             ),
             (
                 4.0,
-                276679,
+                268698,
                 [
                     "side=White, kind=Knight, move=[4, 7] -> [6, 6]",
                     "side=Black, kind=Pawn, move=[6, 1] -> [5, 2]",

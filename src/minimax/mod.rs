@@ -22,6 +22,15 @@ lazy_static! {
 type HeuristicScore = f32;
 
 pub fn evaluate_material_heuristic(state: &BoardState) -> HeuristicScore {
+    if let Some(end_state) = get_board_end_state(state) {
+        return match end_state {
+            EndState::Winner(side) => match side {
+                Side::White => 100f32,
+                Side::Black => -100f32,
+            },
+            EndState::Draw => 0f32,
+        };
+    }
     let mut state = state.clone();
     state.step_until_stationary_with_no_cooldown();
     // count up material
