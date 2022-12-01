@@ -416,3 +416,16 @@ fn test_quiescent_prioritize_taking_queen() {
 //     println!("{}", board.to_stationary_map_combo());
 //     expect!(board.to_stationary_map_combo());
 // }
+
+#[test]
+fn test_initial_board_fen() {
+    let board = BoardState::new_initial_state();
+    let fen = board.to_stationary_fen();
+    expect!(
+        fen,
+        r#"
+        Ok(
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",
+        )"#
+    );
+}

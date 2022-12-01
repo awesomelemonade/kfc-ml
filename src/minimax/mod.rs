@@ -19,6 +19,8 @@ lazy_static! {
     };
 }
 
+const MAX_QUIESCENT_DEPTH: u32 = 10; // TODO
+
 type HeuristicScore = f32;
 
 pub fn evaluate_material_heuristic(state: &BoardState) -> HeuristicScore {
@@ -198,7 +200,7 @@ impl MinimaxOutput {
 pub fn search_white(board: &BoardState, depth: u32) -> OrError<MinimaxOutputInfo> {
     let output = white_move(
         board,
-        depth,
+        depth as i32,
         f32::NEG_INFINITY,
         f32::INFINITY,
         &|_board, _board_move| 0f32, // TODO
@@ -209,7 +211,7 @@ pub fn search_white(board: &BoardState, depth: u32) -> OrError<MinimaxOutputInfo
 
 fn white_move<F, G>(
     state: &BoardState,
-    depth: u32,
+    depth: i32,
     mut alpha: HeuristicScore,
     beta: HeuristicScore,
     move_heuristic: &F,
@@ -219,7 +221,10 @@ where
     F: Fn(&BoardState, &BoardMove) -> HeuristicScore,
     G: Fn(&BoardState) -> HeuristicScore,
 {
-    if state.is_all_pieces_stationary_with_no_cooldown() && depth == 0 {
+    if get_board_end_state(state).is_some()
+        || (state.is_all_pieces_stationary_with_no_cooldown() && depth <= 0)
+        || depth <= -(MAX_QUIESCENT_DEPTH as i32)
+    {
         let score = leaf_heuristic(state);
         return MinimaxOutput::Leaf { score };
     }
@@ -227,7 +232,7 @@ where
     let mut best_opponent_move = None;
     let mut best_score = f32::MIN;
     let mut num_leaves = 0;
-    let possible_moves = if depth == 0 {
+    let possible_moves = if depth <= 0 {
         state.get_sorted_quiescent_moves(Side::White, |kind| MATERIAL_VALUE[kind] as i32)
     } else {
         let mut possible_moves = state.get_all_possible_moves(Side::White);
@@ -269,7 +274,7 @@ where
 
 fn black_move<F, G>(
     state: &BoardState,
-    depth: u32,
+    depth: i32,
     alpha: HeuristicScore,
     mut beta: HeuristicScore,
     pending_white_move: &BoardMove,
@@ -280,7 +285,10 @@ where
     F: Fn(&BoardState, &BoardMove) -> HeuristicScore,
     G: Fn(&BoardState) -> HeuristicScore,
 {
-    if state.is_all_pieces_stationary_with_no_cooldown() && depth == 0 {
+    if get_board_end_state(state).is_some()
+        || (state.is_all_pieces_stationary_with_no_cooldown() && depth <= 0)
+        || depth <= -(MAX_QUIESCENT_DEPTH as i32)
+    {
         let score = evaluate_material_heuristic(state);
         return MinimaxOutput::Leaf { score };
     }
@@ -288,7 +296,7 @@ where
     let mut best_opponent_move = None;
     let mut best_score = f32::MAX;
     let mut num_leaves = 0;
-    let possible_moves = if depth == 0 {
+    let possible_moves = if depth <= 0 {
         state.get_sorted_quiescent_moves(Side::Black, |kind| MATERIAL_VALUE[kind] as i32)
     } else {
         let mut possible_moves = state.get_all_possible_moves(Side::Black);
@@ -300,7 +308,7 @@ where
     };
     for board_move in possible_moves {
         let mut new_state = state.clone();
-        if depth == 0 {
+        if depth <= 0 {
             new_state.apply_move(pending_white_move);
             new_state.apply_move(&board_move);
             // TODO-someday: may need to adjust
@@ -312,7 +320,7 @@ where
         }
         let opponent_move = white_move(
             &new_state,
-            depth.saturating_sub(1),
+            depth - 1,
             alpha,
             beta,
             move_heuristic,

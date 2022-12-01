@@ -841,10 +841,40 @@ impl BoardState {
         }
         Ok(Self::new_with_castling(pieces, false))
     }
+    pub fn to_stationary_fen(&self) -> OrError<String> {
+        if self.is_all_pieces_stationary() {
+            let mut fen = Vec::new();
+            for row in 0..BOARD_SIZE {
+                let mut s = String::new();
+                let mut empty = 0u32;
+                for column in 0..BOARD_SIZE {
+                    if let Some(piece) = self.get_stationary_piece((column, row).into()) {
+                        if empty > 0 {
+                            s.push_str(empty.to_string().as_str());
+                            empty = 0;
+                        }
+                        let c: char = piece.kind.into();
+                        if piece.side == Side::White {
+                            s.push(c.to_ascii_uppercase());
+                        } else {
+                            s.push(c.to_ascii_lowercase());
+                        }
+                    } else {
+                        empty += 1;
+                    }
+                }
+                if empty > 0 {
+                    s.push_str(empty.to_string().as_str());
+                }
+                fen.push(s);
+            }
+            Ok(fen.join("/"))
+        } else {
+            Err(Error!("Pieces are not all stationary"))
+        }
+    }
     pub fn is_all_pieces_stationary(&self) -> bool {
-        self.pieces
-            .iter()
-            .all(|piece| matches!(piece.state, PieceState::Stationary { .. }))
+        self.pieces.iter().all(|piece| piece.state.is_stationary())
     }
     pub fn is_all_pieces_stationary_with_no_cooldown(&self) -> bool {
         self.pieces.iter().all(

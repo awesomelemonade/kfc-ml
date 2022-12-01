@@ -108,17 +108,6 @@ Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
 }
 
 fn main() -> OrError<()> {
-    // let board =
-    //     BoardState::parse_fen("2r2rk1/pp3pp1/b2Pp3/P1Q4p/RPqN2n1/8/2P2PPP/2B1R1K1").unwrap();
-    // let minimax_output: MinimaxOutputInfo = search_white(&board, SEARCH_DEPTH)?;
-    // let representations = minimax_output
-    //     .to_representations()
-    //     .iter()
-    //     .map(|x| Array1::from_vec(x.to_float_array().to_vec()))
-    //     .collect_vec();
-    // let views = representations.iter().map(|x| x.view()).collect_vec();
-    // let stacked_views = numpy::ndarray::stack(Axis(1), &views[..])
-    //     .map_err(|e| Error!("Error creating representations: {}", e))?;
     let code = include_str!("./model.py");
     let result: PyResult<_> = Python::with_gil(|py| {
         println!("Importing Python Code");
