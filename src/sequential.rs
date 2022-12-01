@@ -1,5 +1,7 @@
 core!();
 
+use std::fmt::Display;
+
 use itertools::Itertools;
 use numpy::{
     ndarray::{Array1, Array2, Axis},
@@ -98,19 +100,19 @@ pub enum Layer {
     Linear { weights: Weights, biases: Biases },
 }
 
-impl Layer {
-    // implement display instead?
-    pub fn to_string(&self) -> String {
-        fn to_rounded_floats(vec: &Vec<f32>) -> String {
+impl Display for Layer {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fn to_rounded_floats(vec: &[f32]) -> String {
             let items = vec.iter().map(|x| format!("{:.2}", x)).join(", ");
             format!("[{}]", items)
         }
         match self {
-            Layer::ReLU => String::from("ReLU"),
+            Layer::ReLU => write!(f, "ReLU"),
             Layer::Linear { weights, biases } => {
                 let weights = weights.clone().into_raw_vec();
                 let biases = biases.clone().into_raw_vec();
-                format!(
+                write!(
+                    f,
                     "Linear[weights={}, biases={}]",
                     to_rounded_floats(&weights),
                     to_rounded_floats(&biases)
@@ -118,6 +120,9 @@ impl Layer {
             }
         }
     }
+}
+
+impl Layer {
     fn forward(&self, mut input: Batch) -> Batch {
         match self {
             Layer::ReLU => {

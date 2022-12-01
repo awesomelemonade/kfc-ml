@@ -121,7 +121,7 @@ fn main() -> OrError<()> {
         let file = File::open("processed_random.fen").unwrap();
         let reader = BufReader::new(file);
         let mut losses = Vec::new();
-        let chunk_size = 256;
+        let chunk_size = 1000;
         let debug_every_x = 1;
         for (i, lines) in reader.lines().chunks(chunk_size).into_iter().enumerate() {
             let before = Instant::now();
@@ -140,8 +140,7 @@ fn main() -> OrError<()> {
                 .iter()
                 .map(|board| {
                     let representation: BoardRepresentation = board.into();
-                    let vec = representation.to_float_array().to_vec();
-                    vec
+                    representation.to_float_array().to_vec()
                 })
                 .collect_vec();
             let representations = PyArray2::from_vec2(py, &representations).unwrap();

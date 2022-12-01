@@ -13,7 +13,7 @@ class Model:
             # nn.ReLU(),
             # nn.Linear(256, 1)
         )
-        self.optimizer = optim.Adam(self.model.parameters())
+        self.optimizer = optim.Adam(self.model.parameters(), lr=0.01)
 
     def learn_sequence(self, board_states):
         # learn from this sequence of board_states
