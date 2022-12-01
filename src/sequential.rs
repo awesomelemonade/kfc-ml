@@ -1,5 +1,6 @@
 core!();
 
+use itertools::Itertools;
 use numpy::{
     ndarray::{Array1, Array2, Axis},
     PyArray1, PyArray2,
@@ -18,9 +19,13 @@ pub struct SequentialModel {
 }
 
 impl SequentialModel {
-    // pub fn forward_one(&self, input: Array1<f32>) -> f32 {
-    //     self.forward(input.insert_axis(Axis(1)))[0]
-    // }
+    pub fn layers(&self) -> &Vec<Layer> {
+        &self.layers
+    }
+
+    pub fn forward_one(&self, input: Array1<f32>) -> f32 {
+        self.forward(input.insert_axis(Axis(1)))[0]
+    }
 
     pub fn forward(&self, mut input: Batch) -> Array1<f32> {
         // input = MxN
@@ -81,15 +86,38 @@ impl SequentialModel {
 
         Ok(Self { layers })
     }
+
+    pub fn new_direct(layers: Vec<Layer>) -> Self {
+        Self { layers }
+    }
 }
 
 #[derive(Debug)]
-enum Layer {
+pub enum Layer {
     ReLU,
     Linear { weights: Weights, biases: Biases },
 }
 
 impl Layer {
+    // implement display instead?
+    pub fn to_string(&self) -> String {
+        fn to_rounded_floats(vec: &Vec<f32>) -> String {
+            let items = vec.iter().map(|x| format!("{:.3}", x)).join(", ");
+            format!("[{}]", items)
+        }
+        match self {
+            Layer::ReLU => String::from("ReLU"),
+            Layer::Linear { weights, biases } => {
+                let weights = weights.clone().into_raw_vec();
+                let biases = biases.clone().into_raw_vec();
+                format!(
+                    "Linear[weights={}, biases={}]",
+                    to_rounded_floats(&weights),
+                    to_rounded_floats(&biases)
+                )
+            }
+        }
+    }
     fn forward(&self, mut input: Batch) -> Batch {
         match self {
             Layer::ReLU => {

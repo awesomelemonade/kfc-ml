@@ -892,11 +892,11 @@ impl BoardState {
         let white_pieces = distribution
             .choose_multiple(&mut rand::thread_rng(), num_pieces_per_side - 1)
             .chain(std::iter::once(&PieceKind::King))
-            .map(|kind| (Side::White, kind.clone()));
+            .map(|kind| (Side::White, *kind));
         let black_pieces = distribution
             .choose_multiple(&mut rand::thread_rng(), num_pieces_per_side - 1)
             .chain(std::iter::once(&PieceKind::King))
-            .map(|kind| (Side::Black, kind.clone()));
+            .map(|kind| (Side::Black, *kind));
         let pieces = white_pieces.chain(black_pieces).collect_vec();
         Self::generate_random_board(pieces)
     }

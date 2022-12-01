@@ -15,6 +15,8 @@ core!();
 mod imports;
 
 mod game;
+use std::{fs::File, io::BufRead, io::BufReader};
+
 pub use game::*;
 
 mod minimax;
@@ -108,17 +110,17 @@ Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
 }
 
 fn main() -> OrError<()> {
-    let board =
-        BoardState::parse_fen("2r2rk1/pp3pp1/b2Pp3/P1Q4p/RPqN2n1/8/2P2PPP/2B1R1K1").unwrap();
-    let minimax_output: MinimaxOutputInfo = search_white(&board, SEARCH_DEPTH)?;
-    let representations = minimax_output
-        .to_representations()
-        .iter()
-        .map(|x| Array1::from_vec(x.to_float_array().to_vec()))
-        .collect_vec();
-    let views = representations.iter().map(|x| x.view()).collect_vec();
-    let stacked_views = numpy::ndarray::stack(Axis(1), &views[..])
-        .map_err(|e| Error!("Error creating representations: {}", e))?;
+    // let board =
+    //     BoardState::parse_fen("2r2rk1/pp3pp1/b2Pp3/P1Q4p/RPqN2n1/8/2P2PPP/2B1R1K1").unwrap();
+    // let minimax_output: MinimaxOutputInfo = search_white(&board, SEARCH_DEPTH)?;
+    // let representations = minimax_output
+    //     .to_representations()
+    //     .iter()
+    //     .map(|x| Array1::from_vec(x.to_float_array().to_vec()))
+    //     .collect_vec();
+    // let views = representations.iter().map(|x| x.view()).collect_vec();
+    // let stacked_views = numpy::ndarray::stack(Axis(1), &views[..])
+    //     .map_err(|e| Error!("Error creating representations: {}", e))?;
     let code = include_str!("./model.py");
     let result: PyResult<_> = Python::with_gil(|py| {
         println!("Importing Python Code");
@@ -128,15 +130,23 @@ fn main() -> OrError<()> {
         let model_instance = model.call0()?;
 
         println!("Attempting to learn");
-        let representations = representations
-            .into_iter()
-            .map(|x| PyArray1::from_vec(py, x.to_vec()))
-            .collect_vec();
 
-        for _ in 0..500 {
-            let loss = model_instance.call_method1("learn", (representations.clone(),));
-            let loss = loss.unwrap_with_traceback(py);
-            println!("Loss: {:?}", loss);
+        let file = File::open("processed_random.fen").unwrap();
+        let reader = BufReader::new(file);
+        let mut losses = Vec::new();
+        for (i, line) in reader.lines().enumerate() {
+            let line = line.unwrap();
+            let board = BoardState::parse_fen(&line).unwrap();
+            let representation: BoardRepresentation = (&board).into();
+            let pyarray = PyArray1::from_vec(py, representation.to_float_array().to_vec());
+            let score = minimax::evaluate_material_heuristic(&board);
+            let loss = model_instance.call_method1("learn_single", (pyarray, score));
+            let loss = loss.unwrap_with_traceback(py).extract::<f32>().unwrap();
+            losses.push(loss);
+            if i % 1000 == 0 {
+                let avg: f32 = losses.iter().rev().take(1000).sum::<f32>() / 1000f32;
+                println!("{}", avg);
+            }
         }
 
         println!("Fetching Layers");
@@ -145,9 +155,9 @@ fn main() -> OrError<()> {
         let extracted = SequentialModel::new_from_python(sequential).unwrap();
         Ok(extracted)
     });
-    let sequential = result.map_err(|e| Error!("Unable to fetch model: {}", e))?;
-    let forwarded = sequential.forward(stacked_views);
-    println!("FORWARDED: {:?}", forwarded);
+    let _sequential = result.map_err(|e| Error!("Unable to fetch model: {}", e))?;
+    // let forwarded = sequential.forward(stacked_views);
+    // println!("FORWARDED: {:?}", forwarded);
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|arg| arg == "analyze") {
         run_analysis();

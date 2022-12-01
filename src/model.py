@@ -5,15 +5,17 @@ from torch import nn, optim
 class Model:
     def __init__(self):
         self.model = nn.Sequential(
-            nn.Linear(204, 256),
-            nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Linear(128, 1)
+            nn.Linear(34, 1),
+            # nn.ReLU(),
+            # nn.Linear(1024, 1024),
+            # nn.ReLU(),
+            # nn.Linear(1024, 256),
+            # nn.ReLU(),
+            # nn.Linear(256, 1)
         )
-        self.optimizer = optim.Adadelta(self.model.parameters(), weight_decay=0.1)
+        self.optimizer = optim.Adam(self.model.parameters())
 
-    def learn(self, board_states):
+    def learn_sequence(self, board_states):
         # learn from this sequence of board_states
         discount_factor = 0.7
         scores = [self.model(torch.from_numpy(board_state)) for board_state in board_states]
@@ -27,6 +29,22 @@ class Model:
                 loss = diff + discount_factor * loss
 
         self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        return loss.item()
+
+    def learn_single(self, board_state, score):
+        self.optimizer.zero_grad()
+        out = self.model(torch.from_numpy(board_state))
+        loss = abs(out - score) # L1 loss
+        loss.backward()
+        self.optimizer.step()
+        return loss.item()
+
+    def learn_batch(self, board_state, score):
+        self.optimizer.zero_grad()
+        out = self.model(torch.from_numpy(board_state))
+        loss = sum(abs(out - score)) # L1 loss
         loss.backward()
         self.optimizer.step()
         return loss.item()

@@ -205,31 +205,50 @@ impl BoardRepresentationPiece {
         match self {
             BoardRepresentationPiece::Missing => {
                 array[0] = 0f32;
-                array[1] = 0f32;
-                array[2] = 0f32;
-                array[3] = PIECE_COOLDOWN as f32;
-                array[4] = 0f32;
-                array[5] = 0f32;
             }
             BoardRepresentationPiece::Stationary { x, y, cooldown } => {
                 array[0] = 1f32;
-                array[1] = *x;
-                array[2] = *y;
-                array[3] = *cooldown;
-                array[4] = 0f32;
-                array[5] = 0f32;
             }
-            BoardRepresentationPiece::Moving { x, y, vx, vy } => {
-                array[0] = 2f32;
-                array[1] = *x;
-                array[2] = *y;
-                array[3] = PIECE_COOLDOWN as f32; // moving pieces will have big cooldown
-                array[4] = *vx;
-                array[5] = *vy;
+            BoardRepresentationPiece::Moving { .. } => {
+                panic!();
             }
         }
     }
     const fn num_floats() -> usize {
-        6
+        1
     }
 }
+
+// impl BoardRepresentationPiece {
+//     fn write_floats(&self, array: &mut [f32]) {
+//         match self {
+//             BoardRepresentationPiece::Missing => {
+//                 array[0] = 0f32;
+//                 array[1] = 0f32;
+//                 array[2] = 0f32;
+//                 array[3] = PIECE_COOLDOWN as f32;
+//                 array[4] = 0f32;
+//                 array[5] = 0f32;
+//             }
+//             BoardRepresentationPiece::Stationary { x, y, cooldown } => {
+//                 array[0] = 1f32;
+//                 array[1] = *x;
+//                 array[2] = *y;
+//                 array[3] = *cooldown;
+//                 array[4] = 0f32;
+//                 array[5] = 0f32;
+//             }
+//             BoardRepresentationPiece::Moving { x, y, vx, vy } => {
+//                 array[0] = 2f32;
+//                 array[1] = *x;
+//                 array[2] = *y;
+//                 array[3] = PIECE_COOLDOWN as f32; // moving pieces will have big cooldown
+//                 array[4] = *vx;
+//                 array[5] = *vy;
+//             }
+//         }
+//     }
+//     const fn num_floats() -> usize {
+//         6
+//     }
+// }
