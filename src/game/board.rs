@@ -14,9 +14,6 @@ pub struct BoardState {
     can_short_castle: EnumMap<Side, bool>,
 }
 
-pub static mut Q_COUNT: u32 = 0;
-pub static mut S_COUNT: u32 = 0;
-
 // has to be less than sqrt(2)/2 to ensure bishops do not capture squares
 //                                          it is not supposed to capture
 const DISTANCE_THRESHOLD_SQUARED: f32 = 0.7f32 * 0.7f32;
@@ -352,9 +349,6 @@ impl BoardState {
         self.step(&BoardMove::None(Side::White), &BoardMove::None(Side::Black));
     }
     pub fn step(&mut self, white_move: &BoardMove, black_move: &BoardMove) {
-        unsafe {
-            S_COUNT += 1;
-        }
         debug_assert!(white_move.side() == Side::White);
         debug_assert!(black_move.side() == Side::Black);
         self.apply_move(white_move);
@@ -593,11 +587,6 @@ impl BoardState {
     where
         F: Fn(PieceKind) -> i32,
     {
-        unsafe {
-            Q_COUNT += 1;
-        }
-        // TODO: search promotion moves?
-
         // prioritize captures by computing value of victim - attacker
         // then prioritize getting out of the way - maybe by distance? shorter distance is better?
         // then search None?

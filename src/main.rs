@@ -102,9 +102,6 @@ Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
     let scores = scores.unwrap();
     let average = scores.iter().sum::<f32>() / scores.len() as f32;
     println!("avg={:?}", average);
-    unsafe {
-        println!("Q_COUNT={}, S_COUNT={}", Q_COUNT, S_COUNT);
-    }
 }
 
 fn main() -> OrError<()> {
@@ -131,10 +128,22 @@ fn main() -> OrError<()> {
             // TODO: need to bootstrap using heuristic first
             // TODO: Parallelize, use move_heuristic and leaf_heuristic
             let before_minimax_time = Instant::now();
-            let scores = boards
-                .par_iter()
-                .map(|board| search_white(board, SEARCH_DEPTH).unwrap().score)
+            fn get_time_estimate(board: &BoardState) -> usize {
+                board.pieces().len()
+            }
+            let scores: Vec<_> = boards
+                .iter()
+                .enumerate()
+                .sorted_by_cached_key(|(_index, board)| get_time_estimate(board))
+                .rev()
+                .par_bridge()
+                .map(|(index, board)| (index, search_white(board, SEARCH_DEPTH).unwrap().score))
                 .collect();
+            let scores = scores
+                .into_iter()
+                .sorted_by_key(|(index, _score)| *index)
+                .map(|(_index, score)| score)
+                .collect_vec();
             let minimax_time = before_minimax_time.elapsed();
             let representations = boards
                 .iter()
