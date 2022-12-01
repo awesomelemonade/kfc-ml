@@ -41,13 +41,13 @@ class Model:
         self.optimizer.step()
         return loss.item()
 
-    def learn_batch(self, board_state, score):
+    def learn_batch(self, board_state, scores):
         self.optimizer.zero_grad()
         out = self.model(torch.from_numpy(board_state))
-        loss = sum(abs(out - score)) # L1 loss
+        loss = abs(out - torch.from_numpy(scores[:, np.newaxis])).sum() # L1 loss
         loss.backward()
         self.optimizer.step()
-        return loss.item()
+        return loss.item() / len(scores)
 
     def model_layer_weights(self):
         def layer_info(layer):

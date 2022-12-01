@@ -206,7 +206,7 @@ impl BoardRepresentationPiece {
             BoardRepresentationPiece::Missing => {
                 array[0] = 0f32;
             }
-            BoardRepresentationPiece::Stationary { x, y, cooldown } => {
+            BoardRepresentationPiece::Stationary { .. } => {
                 array[0] = 1f32;
             }
             BoardRepresentationPiece::Moving { .. } => {

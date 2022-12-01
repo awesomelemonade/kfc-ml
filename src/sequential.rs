@@ -102,7 +102,7 @@ impl Layer {
     // implement display instead?
     pub fn to_string(&self) -> String {
         fn to_rounded_floats(vec: &Vec<f32>) -> String {
-            let items = vec.iter().map(|x| format!("{:.3}", x)).join(", ");
+            let items = vec.iter().map(|x| format!("{:.2}", x)).join(", ");
             format!("[{}]", items)
         }
         match self {

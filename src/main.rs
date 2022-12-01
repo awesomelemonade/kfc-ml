@@ -15,7 +15,7 @@ core!();
 mod imports;
 
 mod game;
-use std::{fs::File, io::BufRead, io::BufReader};
+use std::{fs::File, io::BufRead, io::BufReader, time::Instant};
 
 pub use game::*;
 
@@ -31,12 +31,10 @@ mod sequential;
 
 use itertools::Itertools;
 
-use numpy::{
-    ndarray::{Array1, Axis},
-    PyArray1,
-};
+use numpy::{PyArray1, PyArray2};
 use pyo3::{prelude::*, types::PyModule};
 use rand::seq::SliceRandom;
+use rayon::prelude::*;
 
 use crate::{sequential::SequentialModel, util::UnwrapWithTraceback};
 
@@ -134,18 +132,50 @@ fn main() -> OrError<()> {
         let file = File::open("processed_random.fen").unwrap();
         let reader = BufReader::new(file);
         let mut losses = Vec::new();
-        for (i, line) in reader.lines().enumerate() {
-            let line = line.unwrap();
-            let board = BoardState::parse_fen(&line).unwrap();
-            let representation: BoardRepresentation = (&board).into();
-            let pyarray = PyArray1::from_vec(py, representation.to_float_array().to_vec());
-            let score = minimax::evaluate_material_heuristic(&board);
-            let loss = model_instance.call_method1("learn_single", (pyarray, score));
+        let chunk_size = 256;
+        let debug_every_x = 1;
+        for (i, lines) in reader.lines().chunks(chunk_size).into_iter().enumerate() {
+            let before = Instant::now();
+            let boards = lines
+                .map(|line| BoardState::parse_fen(line.unwrap().as_str()).unwrap())
+                .collect_vec();
+            // TODO: need to bootstrap using heuristic first
+            // TODO: Parallelize, use move_heuristic and leaf_heuristic
+            let before_minimax_time = Instant::now();
+            let scores = boards
+                .par_iter()
+                .map(|board| search_white(board, SEARCH_DEPTH).unwrap().score)
+                .collect();
+            let minimax_time = before_minimax_time.elapsed();
+            let representations = boards
+                .iter()
+                .map(|board| {
+                    let representation: BoardRepresentation = board.into();
+                    let vec = representation.to_float_array().to_vec();
+                    vec
+                })
+                .collect_vec();
+            let representations = PyArray2::from_vec2(py, &representations).unwrap();
+            let scores = PyArray1::from_vec(py, scores);
+
+            let loss = model_instance.call_method1("learn_batch", (representations, scores));
             let loss = loss.unwrap_with_traceback(py).extract::<f32>().unwrap();
             losses.push(loss);
-            if i % 1000 == 0 {
-                let avg: f32 = losses.iter().rev().take(1000).sum::<f32>() / 1000f32;
-                println!("{}", avg);
+            let elapsed = before.elapsed();
+            if i % debug_every_x == 0 {
+                let avg: f32 =
+                    losses.iter().rev().take(debug_every_x).sum::<f32>() / (debug_every_x as f32);
+                let sequential = model_instance.call_method0("model_layer_weights")?;
+                let extracted = SequentialModel::new_from_python(sequential).unwrap();
+                let weights = extracted.layers().first().unwrap().to_string();
+                println!(
+                    "epoch={}, elapsed={:.2?}, per board={:.2?}, minimax per board={:.2?}",
+                    i,
+                    elapsed,
+                    elapsed.div_f32(chunk_size as f32),
+                    minimax_time.div_f32(chunk_size as f32),
+                );
+                println!("{} => {}", avg, weights);
             }
         }
 
