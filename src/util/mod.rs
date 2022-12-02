@@ -1,6 +1,37 @@
 use std::{cmp::Ordering, mem};
 
+use itertools::Itertools;
 use pyo3::{PyResult, Python};
+use rayon::prelude::*;
+
+#[cfg(test)]
+mod util_tests;
+
+pub fn parallel_map_prioritized_by<'a: 'b, 'b, T: 'b, U, V, F, P>(
+    vec: &'a Vec<T>,
+    map_op: F,
+    prioritizer: P,
+) -> Vec<U>
+where
+    &'b T: Send,
+    U: Send,
+    F: Fn(&T) -> U + Sync,
+    P: Fn(&T) -> V,
+    V: Ord,
+{
+    let unsorted: Vec<_> = vec
+        .iter()
+        .enumerate()
+        .sorted_by_cached_key(|(_index, item)| prioritizer(item))
+        .par_bridge()
+        .map(|(index, item)| (index, map_op(item)))
+        .collect();
+    unsorted
+        .into_iter()
+        .sorted_by_key(|(index, _item)| *index)
+        .map(|(_index, item)| item)
+        .collect_vec()
+}
 
 pub trait UnwrapWithTraceback<T> {
     fn unwrap_with_traceback(self, py: Python) -> T;

@@ -34,9 +34,11 @@ use itertools::Itertools;
 use numpy::{PyArray1, PyArray2};
 use pyo3::{prelude::*, types::PyModule};
 use rand::seq::SliceRandom;
-use rayon::prelude::*;
 
-use crate::{sequential::SequentialModel, util::UnwrapWithTraceback};
+use crate::{
+    sequential::SequentialModel,
+    util::{parallel_map_prioritized_by, UnwrapWithTraceback},
+};
 
 const SEARCH_DEPTH: u32 = 2;
 
@@ -131,19 +133,11 @@ fn main() -> OrError<()> {
             fn get_time_estimate(board: &BoardState) -> usize {
                 board.pieces().len()
             }
-            let scores: Vec<_> = boards
-                .iter()
-                .enumerate()
-                .sorted_by_cached_key(|(_index, board)| get_time_estimate(board))
-                .rev()
-                .par_bridge()
-                .map(|(index, board)| (index, search_white(board, SEARCH_DEPTH).unwrap().score))
-                .collect();
-            let scores = scores
-                .into_iter()
-                .sorted_by_key(|(index, _score)| *index)
-                .map(|(_index, score)| score)
-                .collect_vec();
+            let scores = parallel_map_prioritized_by(
+                &boards,
+                |board| search_white(board, SEARCH_DEPTH).unwrap().score,
+                |board| -(get_time_estimate(board) as i32), // order by descending time estimate
+            );
             let minimax_time = before_minimax_time.elapsed();
             let representations = boards
                 .iter()
