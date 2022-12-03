@@ -19,7 +19,7 @@ lazy_static! {
     };
 }
 
-const MAX_QUIESCENT_DEPTH: u32 = 10; // TODO
+const MAX_QUIESCENT_DEPTH: u32 = 2; // TODO (was 5)
 
 type HeuristicScore = f32;
 
@@ -100,11 +100,14 @@ pub enum EndState {
     Draw,
 }
 
+#[derive(Debug)]
 pub struct MinimaxOutputInfo {
     pub board: BoardState,
     pub search_depth: u32,
     pub score: HeuristicScore,
     pub num_leaves: u32,
+    pub num_regular_nodes: u32,
+    pub num_quiescent_nodes: u32,
     pub moves: Vec<BoardMove>,
 }
 
@@ -164,6 +167,8 @@ impl MinimaxOutputInfo {
             moves,
             board,
             search_depth,
+            num_regular_nodes: output.num_regular_nodes(search_depth as i32),
+            num_quiescent_nodes: output.num_quiescent_nodes(search_depth as i32),
         })
     }
 }
@@ -175,6 +180,8 @@ pub enum MinimaxOutput {
         best_score: HeuristicScore,
         num_leaves: u32,
         next: Box<MinimaxOutput>,
+        num_regular_nodes: u32,
+        num_quiescent_nodes: u32,
     },
     Leaf {
         score: HeuristicScore,
@@ -194,6 +201,25 @@ impl MinimaxOutput {
             MinimaxOutput::Node { num_leaves, .. } => *num_leaves,
             MinimaxOutput::Leaf { .. } => 1,
         }
+    }
+
+    pub fn num_regular_nodes(&self, depth: i32) -> u32 {
+        (match self {
+            MinimaxOutput::Node {
+                num_regular_nodes, ..
+            } => *num_regular_nodes,
+            MinimaxOutput::Leaf { .. } => 0,
+        }) + (if depth < 0 { 0u32 } else { 1u32 })
+    }
+
+    pub fn num_quiescent_nodes(&self, depth: i32) -> u32 {
+        (match self {
+            MinimaxOutput::Node {
+                num_quiescent_nodes,
+                ..
+            } => *num_quiescent_nodes,
+            MinimaxOutput::Leaf { .. } => 0,
+        }) + (if depth < 0 { 1u32 } else { 0u32 })
     }
 }
 
@@ -232,11 +258,13 @@ where
     let mut best_opponent_move = None;
     let mut best_score = f32::MIN;
     let mut num_leaves = 0;
+    let mut num_regular_nodes = 0;
+    let mut num_quiescent_nodes = 0;
     let possible_moves = if depth <= 0 {
         state.get_sorted_quiescent_moves(Side::White, |kind| MATERIAL_VALUE[kind] as i32)
     } else {
         let mut possible_moves = state.get_all_possible_moves(Side::White);
-        // greater heuristic score = better for white, so we sort by the negative
+        // greater heuristic score = better for white, so we sort descending
         util::sort_by_cached_f32_exn(&mut possible_moves, |possible_move| {
             -move_heuristic(state, possible_move)
         });
@@ -253,6 +281,8 @@ where
             leaf_heuristic,
         );
         num_leaves += opponent_move.num_leaves();
+        num_regular_nodes += opponent_move.num_regular_nodes(depth);
+        num_quiescent_nodes += opponent_move.num_quiescent_nodes(depth);
         let score = opponent_move.score();
         if score > best_score {
             best_move = board_move;
@@ -269,6 +299,8 @@ where
         best_score,
         num_leaves,
         next: Box::new(best_opponent_move.unwrap()),
+        num_regular_nodes,
+        num_quiescent_nodes,
     }
 }
 
@@ -296,11 +328,13 @@ where
     let mut best_opponent_move = None;
     let mut best_score = f32::MAX;
     let mut num_leaves = 0;
+    let mut num_regular_nodes = 0;
+    let mut num_quiescent_nodes = 0;
     let possible_moves = if depth <= 0 {
         state.get_sorted_quiescent_moves(Side::Black, |kind| MATERIAL_VALUE[kind] as i32)
     } else {
         let mut possible_moves = state.get_all_possible_moves(Side::Black);
-        // greater heuristic score = better for white, so we sort by the positive
+        // greater heuristic score = better for white, so we sort ascending
         util::sort_by_cached_f32_exn(&mut possible_moves, |possible_move| {
             move_heuristic(state, possible_move)
         });
@@ -327,6 +361,8 @@ where
             leaf_heuristic,
         );
         num_leaves += opponent_move.num_leaves();
+        num_regular_nodes += opponent_move.num_regular_nodes(depth);
+        num_quiescent_nodes += opponent_move.num_quiescent_nodes(depth);
         let score = opponent_move.score();
         if score < best_score {
             best_score = score;
@@ -343,5 +379,7 @@ where
         best_score,
         num_leaves,
         next: Box::new(best_opponent_move.unwrap()),
+        num_regular_nodes,
+        num_quiescent_nodes,
     }
 }

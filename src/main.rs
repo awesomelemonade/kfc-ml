@@ -121,7 +121,9 @@ fn main() -> OrError<()> {
         let reader = BufReader::new(file);
         let mut losses = Vec::new();
         let chunk_size = 1000;
+        let learn_batch_size = 10;
         let debug_every_x = 1;
+        let debug_stats = false;
         for (i, lines) in reader.lines().chunks(chunk_size).into_iter().enumerate() {
             let before = Instant::now();
             let boards = lines
@@ -135,23 +137,66 @@ fn main() -> OrError<()> {
             }
             let scores = parallel_map_prioritized_by(
                 &boards,
-                |board| search_white(board, SEARCH_DEPTH).unwrap().score,
+                |board| {
+                    let before = Instant::now();
+                    let out = search_white(board, SEARCH_DEPTH).unwrap();
+                    let score = out.score;
+                    let elapsed = before.elapsed();
+                    // number of pieces and elapsed
+                    if debug_stats {
+                        let best_piece = if let Some(best_move) = out.moves.first() {
+                            match best_move {
+                                BoardMove::None(_) => "None".to_owned(),
+                                BoardMove::LongCastle(_) => "LongCastle".to_owned(),
+                                BoardMove::ShortCastle(_) => "ShortCastle".to_owned(),
+                                BoardMove::Normal { piece, .. } => format!("{:?}", piece.kind),
+                            }
+                        } else {
+                            "N/A".to_owned()
+                        };
+                        println!(
+                            "{}, {}, {}, {}, {}, {}, {}",
+                            board.pieces().len(),
+                            out.num_leaves,
+                            out.num_regular_nodes,
+                            out.num_quiescent_nodes,
+                            elapsed.as_millis(),
+                            board.to_stationary_fen().unwrap(),
+                            best_piece,
+                        );
+                    }
+                    score
+                },
                 |board| -(get_time_estimate(board) as i32), // order by descending time estimate
             );
             let minimax_time = before_minimax_time.elapsed();
-            let representations = boards
-                .iter()
-                .map(|board| {
-                    let representation: BoardRepresentation = board.into();
-                    representation.to_float_array().to_vec()
-                })
-                .collect_vec();
-            let representations = PyArray2::from_vec2(py, &representations).unwrap();
-            let scores = PyArray1::from_vec(py, scores);
 
-            let loss = model_instance.call_method1("learn_batch", (representations, scores));
-            let loss = loss.unwrap_with_traceback(py).extract::<f32>().unwrap();
-            losses.push(loss);
+            let mut total_loss = 0f32;
+            let mut num_losses = 0;
+            for chunks in &boards
+                .into_iter()
+                .zip_eq(scores.into_iter())
+                .chunks(learn_batch_size)
+            {
+                let (boards, scores): (Vec<_>, Vec<_>) = chunks.unzip();
+
+                let representations = boards
+                    .iter()
+                    .map(|board| {
+                        let representation: BoardRepresentation = board.into();
+                        representation.to_float_array().to_vec()
+                    })
+                    .collect_vec();
+                let representations = PyArray2::from_vec2(py, &representations).unwrap();
+                let scores = PyArray1::from_vec(py, scores);
+
+                let loss = model_instance.call_method1("learn_batch", (representations, scores));
+                let loss = loss.unwrap_with_traceback(py).extract::<f32>().unwrap();
+                total_loss += loss;
+                num_losses += 1;
+            }
+
+            losses.push(total_loss / (num_losses as f32));
             let elapsed = before.elapsed();
             if i % debug_every_x == 0 {
                 let avg: f32 =

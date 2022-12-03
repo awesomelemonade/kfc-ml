@@ -8,7 +8,7 @@ use rayon::prelude::*;
 mod util_tests;
 
 pub fn parallel_map_prioritized_by<'a: 'b, 'b, T: 'b, U, V, F, P>(
-    vec: &'a Vec<T>,
+    vec: &'a [T],
     map_op: F,
     prioritizer: P,
 ) -> Vec<U>
