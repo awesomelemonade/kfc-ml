@@ -103,8 +103,8 @@ pub enum Layer {
 impl Display for Layer {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         fn to_rounded_floats(vec: &[f32]) -> String {
-            let items = vec.iter().map(|x| format!("{:.2}", x)).join(", ");
-            format!("[{}]", items)
+            let items = vec.iter().map(|x| format!("{x:.2}")).join(", ");
+            format!("[{items}]")
         }
         match self {
             Layer::ReLU => write!(f, "ReLU"),
@@ -125,9 +125,9 @@ impl Display for Layer {
 impl Layer {
     pub fn to_raw_string(&self) -> String {
         match self {
-            Layer::ReLU => format!("ReLU"),
+            Layer::ReLU => "ReLU".to_string(),
             Layer::Linear { weights, biases } => {
-                format!("Linear[weights={:#?}, biases={:#?}]", weights, biases)
+                format!("Linear[weights={weights:#?}, biases={biases:#?}]")
             }
         }
     }

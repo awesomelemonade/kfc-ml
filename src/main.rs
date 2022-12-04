@@ -89,11 +89,11 @@ impl Display for VersusStats {
         let c = Outcome::values().map(|x| (x, self.b_as_white[&x]));
         let d = Outcome::values().map(|x| (x, self.b_as_black[&x]));
         writeln!(f, "Player A")?;
-        writeln!(f, "\tAs White: {:?}", a)?;
-        writeln!(f, "\tAs Black: {:?}", b)?;
+        writeln!(f, "\tAs White: {a:?}")?;
+        writeln!(f, "\tAs Black: {b:?}")?;
         writeln!(f, "Player B")?;
-        writeln!(f, "\tAs White: {:?}", c)?;
-        writeln!(f, "\tAs Black: {:?}", d)
+        writeln!(f, "\tAs White: {c:?}")?;
+        writeln!(f, "\tAs Black: {d:?}")
     }
 }
 
@@ -234,7 +234,7 @@ where
 fn main() -> OrError<()> {
     let args: Vec<String> = std::env::args().collect();
     let run_all_epochs = args.iter().any(|arg| arg == "--all");
-    println!("Run all epochs? {}", run_all_epochs);
+    println!("Run all epochs? {run_all_epochs}");
     let code = include_str!("./model.py");
     let result: PyResult<_> = Python::with_gil(|py| {
         println!("Importing Python Code");
@@ -255,6 +255,7 @@ fn main() -> OrError<()> {
         let learn_batch_size = 10;
         let debug_every_x = 1;
         let debug_stats = false;
+        let num_versus_games = if run_all_epochs { 10 } else { 1 };
         let versus_stats = true;
         for (i, lines) in reader.lines().chunks(chunk_size).into_iter().enumerate() {
             let before = Instant::now();
@@ -266,12 +267,12 @@ fn main() -> OrError<()> {
                 let extracted = SequentialModel::new_from_python(sequential).unwrap();
 
                 let versus_stats = get_versus_stats(
-                    &boards[..10],
+                    &boards[..num_versus_games],
                     1000,
                     |board, side| move_from_minimax_with_sequential(board, side, &extracted),
                     move_from_minimax_with_heuristic,
                 );
-                println!("Stats:\n{}", versus_stats);
+                println!("Stats:\n{versus_stats}");
             }
             // TODO: need to bootstrap using heuristic first
             // TODO: Parallelize, use move_heuristic and leaf_heuristic
@@ -355,8 +356,8 @@ fn main() -> OrError<()> {
                     elapsed.div_f32(chunk_size as f32),
                     minimax_time.div_f32(chunk_size as f32),
                 );
-                writeln!(losses_file, "{}", avg).expect("Unable to write to losses_file");
-                writeln!(weights_file, "epoch={}\n{}", i, weights)
+                writeln!(losses_file, "{avg}").expect("Unable to write to losses_file");
+                writeln!(weights_file, "epoch={i}\n{weights}")
                     .expect("Unable to write to weights_file");
             }
             if !run_all_epochs {
