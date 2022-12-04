@@ -55,8 +55,12 @@ fn move_from_minimax_with_sequential(
     side: Side,
     model: &SequentialModel,
 ) -> BoardMove {
-    // TODO: only supports Side::White!!
     search_white(board, SEARCH_DEPTH, |board| {
+        if let Some(end_state) = minimax::get_board_end_state(board) {
+            return end_state.to_heuristic_score(100f32);
+        }
+        let mut board = board.clone();
+        board.step_until_stationary_with_no_cooldown();
         let representation: BoardRepresentation = board.into();
         let array = Array1::from_vec(representation.to_float_array().to_vec());
         model.forward_one(array)
@@ -66,7 +70,6 @@ fn move_from_minimax_with_sequential(
 }
 
 fn move_from_minimax_with_heuristic(board: &BoardState, side: Side) -> BoardMove {
-    // TODO: only supports Side::White!!
     search_white_with_heuristic(board, SEARCH_DEPTH)
         .unwrap()
         .get_first_move_of_side(side)
@@ -230,9 +233,8 @@ where
 
 fn main() -> OrError<()> {
     let args: Vec<String> = std::env::args().collect();
-    if args.iter().any(|arg| arg == "test") {
-        println!("test");
-    }
+    let run_all_epochs = args.iter().any(|arg| arg == "--all");
+    println!("Run all epochs? {}", run_all_epochs);
     let code = include_str!("./model.py");
     let result: PyResult<_> = Python::with_gil(|py| {
         println!("Importing Python Code");
@@ -253,18 +255,24 @@ fn main() -> OrError<()> {
         let learn_batch_size = 10;
         let debug_every_x = 1;
         let debug_stats = false;
+        let versus_stats = true;
         for (i, lines) in reader.lines().chunks(chunk_size).into_iter().enumerate() {
             let before = Instant::now();
             let boards = lines
                 .map(|line| BoardState::parse_fen(line.unwrap().as_str()).unwrap())
                 .collect_vec();
-            let versus_stats = get_versus_stats(
-                &boards[..10],
-                1000,
-                move_from_minimax_with_heuristic,
-                random_move,
-            );
-            println!("Stats:\n{}", versus_stats);
+            if versus_stats {
+                let sequential = model_instance.call_method0("model_layer_weights")?;
+                let extracted = SequentialModel::new_from_python(sequential).unwrap();
+
+                let versus_stats = get_versus_stats(
+                    &boards[..10],
+                    1000,
+                    |board, side| move_from_minimax_with_sequential(board, side, &extracted),
+                    move_from_minimax_with_heuristic,
+                );
+                println!("Stats:\n{}", versus_stats);
+            }
             // TODO: need to bootstrap using heuristic first
             // TODO: Parallelize, use move_heuristic and leaf_heuristic
             let before_minimax_time = Instant::now();
@@ -350,6 +358,9 @@ fn main() -> OrError<()> {
                 writeln!(losses_file, "{}", avg).expect("Unable to write to losses_file");
                 writeln!(weights_file, "epoch={}\n{}", i, weights)
                     .expect("Unable to write to weights_file");
+            }
+            if !run_all_epochs {
+                break;
             }
         }
 
