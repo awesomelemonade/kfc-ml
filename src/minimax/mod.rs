@@ -112,6 +112,22 @@ pub struct MinimaxOutputInfo {
 }
 
 impl MinimaxOutputInfo {
+    pub fn get_first_move_of_side(&self, side: Side) -> BoardMove {
+        match side {
+            Side::White => self.get_first_white_move(),
+            Side::Black => self.get_first_black_move(),
+        }
+    }
+    pub fn get_first_white_move(&self) -> BoardMove {
+        let board_move = self.moves.first().cloned().unwrap();
+        debug_assert!(board_move.side() == Side::White);
+        board_move
+    }
+    pub fn get_first_black_move(&self) -> BoardMove {
+        let board_move = self.moves.get(1).cloned().unwrap();
+        debug_assert!(board_move.side() == Side::Black);
+        board_move
+    }
     // TODO-someday: assumes white first when it probably shouldn't
     pub fn iter_states<F>(&self, mut f: F)
     where

@@ -15,7 +15,9 @@ core!();
 mod imports;
 
 mod game;
-use std::{cmp::Ordering, fs::File, io::BufRead, io::BufReader, io::Write, time::Instant};
+use std::{
+    cmp::Ordering, fmt::Display, fs::File, io::BufRead, io::BufReader, io::Write, time::Instant,
+};
 
 use counter::Counter;
 pub use game::*;
@@ -48,7 +50,11 @@ fn random_move(board: &BoardState, side: Side) -> BoardMove {
     all_moves.choose(&mut rand::thread_rng()).cloned().unwrap()
 }
 
-fn move_from_minimax_with_sequential(board: &BoardState, model: &SequentialModel) -> BoardMove {
+fn move_from_minimax_with_sequential(
+    board: &BoardState,
+    side: Side,
+    model: &SequentialModel,
+) -> BoardMove {
     // TODO: only supports Side::White!!
     search_white(board, SEARCH_DEPTH, |board| {
         let representation: BoardRepresentation = board.into();
@@ -56,73 +62,100 @@ fn move_from_minimax_with_sequential(board: &BoardState, model: &SequentialModel
         model.forward_one(array)
     })
     .unwrap()
-    .moves
-    .first()
-    .cloned()
-    .unwrap()
+    .get_first_move_of_side(side)
 }
 
-fn move_from_minimax_with_heuristic(board: &BoardState) -> BoardMove {
+fn move_from_minimax_with_heuristic(board: &BoardState, side: Side) -> BoardMove {
     // TODO: only supports Side::White!!
     search_white_with_heuristic(board, SEARCH_DEPTH)
         .unwrap()
-        .moves
-        .first()
-        .cloned()
-        .unwrap()
+        .get_first_move_of_side(side)
+}
+
+struct VersusStats {
+    a_as_white: Counter<Outcome>,
+    a_as_black: Counter<Outcome>,
+    b_as_white: Counter<Outcome>,
+    b_as_black: Counter<Outcome>,
+}
+
+impl Display for VersusStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let a = Outcome::values().map(|x| (x, self.a_as_white[&x]));
+        let b = Outcome::values().map(|x| (x, self.a_as_black[&x]));
+        let c = Outcome::values().map(|x| (x, self.b_as_white[&x]));
+        let d = Outcome::values().map(|x| (x, self.b_as_black[&x]));
+        writeln!(f, "Player A")?;
+        writeln!(f, "\tAs White: {:?}", a)?;
+        writeln!(f, "\tAs Black: {:?}", b)?;
+        writeln!(f, "Player B")?;
+        writeln!(f, "\tAs White: {:?}", c)?;
+        writeln!(f, "\tAs Black: {:?}", d)
+    }
 }
 
 // take some random boards, play one as white, one as black, all the way to the end, count wins/draws/losses of each player as white/black
 fn get_versus_stats<F, G>(
-    boards: &Vec<BoardState>,
+    boards: &[BoardState],
     max_steps: usize,
-    mut player_a: F,
-    mut player_b: G,
-) -> (Counter<Outcome>, Counter<Outcome>)
+    player_a: F,
+    player_b: G,
+) -> VersusStats
 where
-    F: FnMut(&BoardState) -> BoardMove,
-    G: FnMut(&BoardState) -> BoardMove,
+    F: Fn(&BoardState, Side) -> BoardMove + Sync,
+    G: Fn(&BoardState, Side) -> BoardMove + Sync,
 {
-    let (outcomes_as_white, outcomes_as_black): (Vec<_>, Vec<_>) = boards
-        .iter()
-        .map(|board| {
-            let a = play_to_end_state(
-                board.clone(),
-                max_steps,
-                |board| player_a(board),
-                |board| player_b(board),
-            );
-            let b = play_to_end_state(
-                board.clone(),
-                max_steps,
-                |board| player_b(board),
-                |board| player_a(board),
-            );
-            let outcome_a = match a {
-                EndState::Winner(side) => match side {
-                    Side::White => Outcome::Win,
-                    Side::Black => Outcome::Lose,
-                },
-                EndState::Draw => Outcome::Draw,
-            };
-            let outcome_b = match b {
-                EndState::Winner(side) => match side {
-                    Side::White => Outcome::Lose,
-                    Side::Black => Outcome::Win,
-                },
-                EndState::Draw => Outcome::Draw,
-            };
-            (outcome_a, outcome_b)
-        })
-        .unzip();
-    // change to counters
-    (
-        outcomes_as_white.into_iter().collect::<Counter<_>>(),
-        outcomes_as_black.into_iter().collect::<Counter<_>>(),
-    )
+    let (a_as_white, a_as_black, b_as_white, b_as_black): (
+        Counter<_>,
+        Counter<_>,
+        Counter<_>,
+        Counter<_>,
+    ) = parallel_map_prioritized_by_pieces(&boards, |board| {
+        let a = play_to_end_state(
+            board.clone(),
+            max_steps,
+            |board| player_a(board, Side::White),
+            |board| player_b(board, Side::Black),
+        );
+        let b = play_to_end_state(
+            board.clone(),
+            max_steps,
+            |board| player_b(board, Side::White),
+            |board| player_a(board, Side::Black),
+        );
+        let outcome_a = match a {
+            EndState::Winner(side) => match side {
+                Side::White => Outcome::Win,
+                Side::Black => Outcome::Lose,
+            },
+            EndState::Draw => Outcome::Draw,
+        };
+        let outcome_b = match b {
+            EndState::Winner(side) => match side {
+                Side::White => Outcome::Lose,
+                Side::Black => Outcome::Win,
+            },
+            EndState::Draw => Outcome::Draw,
+        };
+        (
+            outcome_a,
+            outcome_b,
+            outcome_b.opposite(),
+            outcome_a.opposite(),
+        )
+    })
+    .into_iter()
+    .multiunzip();
+
+    VersusStats {
+        a_as_white,
+        a_as_black,
+        b_as_white,
+        b_as_black,
+    }
 }
 
-#[derive(Hash, Eq, PartialEq)]
+#[derive(Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Clone, Copy)]
 enum Outcome {
     Win,
     Draw,
@@ -130,11 +163,22 @@ enum Outcome {
 }
 
 impl Outcome {
+    // TODO-someday: to be derived
+    fn values() -> [Outcome; 3] {
+        [Outcome::Win, Outcome::Draw, Outcome::Lose]
+    }
     fn score(self) -> f32 {
         match self {
             Outcome::Win => 1f32,
             Outcome::Draw => 0.5f32,
             Outcome::Lose => 0f32,
+        }
+    }
+    fn opposite(self) -> Outcome {
+        match self {
+            Outcome::Win => Outcome::Lose,
+            Outcome::Draw => Outcome::Draw,
+            Outcome::Lose => Outcome::Win,
         }
     }
 }
@@ -169,6 +213,21 @@ where
     }
 }
 
+fn parallel_map_prioritized_by_pieces<T, F>(boards: &[BoardState], f: F) -> Vec<T>
+where
+    F: Fn(&BoardState) -> T + Sync,
+    T: Send,
+{
+    fn get_time_estimate(board: &BoardState) -> usize {
+        board.pieces().len()
+    }
+    parallel_map_prioritized_by(
+        boards,
+        f,
+        |board| -(get_time_estimate(board) as i32), // order by descending time estimate
+    )
+}
+
 fn main() -> OrError<()> {
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|arg| arg == "test") {
@@ -199,46 +258,46 @@ fn main() -> OrError<()> {
             let boards = lines
                 .map(|line| BoardState::parse_fen(line.unwrap().as_str()).unwrap())
                 .collect_vec();
+            let versus_stats = get_versus_stats(
+                &boards[..10],
+                1000,
+                move_from_minimax_with_heuristic,
+                random_move,
+            );
+            println!("Stats:\n{}", versus_stats);
             // TODO: need to bootstrap using heuristic first
             // TODO: Parallelize, use move_heuristic and leaf_heuristic
             let before_minimax_time = Instant::now();
-            fn get_time_estimate(board: &BoardState) -> usize {
-                board.pieces().len()
-            }
-            let scores = parallel_map_prioritized_by(
-                &boards,
-                |board| {
-                    let before = Instant::now();
-                    let out = search_white_with_heuristic(board, SEARCH_DEPTH).unwrap();
-                    let score = out.score;
-                    let elapsed = before.elapsed();
-                    // number of pieces and elapsed
-                    if debug_stats {
-                        let best_piece = if let Some(best_move) = out.moves.first() {
-                            match best_move {
-                                BoardMove::None(_) => "None".to_owned(),
-                                BoardMove::LongCastle(_) => "LongCastle".to_owned(),
-                                BoardMove::ShortCastle(_) => "ShortCastle".to_owned(),
-                                BoardMove::Normal { piece, .. } => format!("{:?}", piece.kind),
-                            }
-                        } else {
-                            "N/A".to_owned()
-                        };
-                        println!(
-                            "{}, {}, {}, {}, {}, {}, {}",
-                            board.pieces().len(),
-                            out.num_leaves,
-                            out.num_regular_nodes,
-                            out.num_quiescent_nodes,
-                            elapsed.as_millis(),
-                            board.to_stationary_fen().unwrap(),
-                            best_piece,
-                        );
-                    }
-                    score
-                },
-                |board| -(get_time_estimate(board) as i32), // order by descending time estimate
-            );
+            let scores = parallel_map_prioritized_by_pieces(&boards, |board| {
+                let before = Instant::now();
+                let out = search_white_with_heuristic(board, SEARCH_DEPTH).unwrap();
+                let score = out.score;
+                let elapsed = before.elapsed();
+                // number of pieces and elapsed
+                if debug_stats {
+                    let best_piece = if let Some(best_move) = out.moves.first() {
+                        match best_move {
+                            BoardMove::None(_) => "None".to_owned(),
+                            BoardMove::LongCastle(_) => "LongCastle".to_owned(),
+                            BoardMove::ShortCastle(_) => "ShortCastle".to_owned(),
+                            BoardMove::Normal { piece, .. } => format!("{:?}", piece.kind),
+                        }
+                    } else {
+                        "N/A".to_owned()
+                    };
+                    println!(
+                        "{}, {}, {}, {}, {}, {}, {}",
+                        board.pieces().len(),
+                        out.num_leaves,
+                        out.num_regular_nodes,
+                        out.num_quiescent_nodes,
+                        elapsed.as_millis(),
+                        board.to_stationary_fen().unwrap(),
+                        best_piece,
+                    );
+                }
+                score
+            });
             let minimax_time = before_minimax_time.elapsed();
 
             let mut total_loss = 0f32;
@@ -268,6 +327,7 @@ fn main() -> OrError<()> {
 
             losses.push(total_loss / (num_losses as f32));
             let elapsed = before.elapsed();
+
             if i % debug_every_x == 0 {
                 let avg: f32 =
                     losses.iter().rev().take(debug_every_x).sum::<f32>() / (debug_every_x as f32);
