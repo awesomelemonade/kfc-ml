@@ -58,7 +58,7 @@ fn test_moves() {
                 num_leaves,
                 moves,
                 ..
-            } = search_white(state, SEARCH_DEPTH).unwrap();
+            } = search_white_with_heuristic(state, SEARCH_DEPTH).unwrap();
             let moves = moves.iter().map(to_compressed_debug).collect_vec();
             Ok((score, num_leaves, moves))
         })
