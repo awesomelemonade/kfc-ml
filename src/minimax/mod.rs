@@ -223,14 +223,25 @@ impl MinimaxOutput {
     }
 }
 
-pub fn search_white(board: &BoardState, depth: u32) -> OrError<MinimaxOutputInfo> {
+pub fn search_white_with_heuristic(board: &BoardState, depth: u32) -> OrError<MinimaxOutputInfo> {
+    search_white(board, depth, evaluate_material_heuristic)
+}
+
+pub fn search_white<F>(
+    board: &BoardState,
+    depth: u32,
+    leaf_heuristic: F,
+) -> OrError<MinimaxOutputInfo>
+where
+    F: Fn(&BoardState) -> HeuristicScore,
+{
     let output = white_move(
         board,
         depth as i32,
         f32::NEG_INFINITY,
         f32::INFINITY,
         &|_board, _board_move| 0f32, // TODO
-        &evaluate_material_heuristic,
+        &leaf_heuristic,
     );
     MinimaxOutputInfo::try_from(&output, board.clone(), depth)
 }

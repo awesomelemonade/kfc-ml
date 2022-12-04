@@ -15,8 +15,9 @@ core!();
 mod imports;
 
 mod game;
-use std::{fs::File, io::BufRead, io::BufReader, time::Instant};
+use std::{cmp::Ordering, fs::File, io::BufRead, io::BufReader, io::Write, time::Instant};
 
+use counter::Counter;
 pub use game::*;
 
 mod minimax;
@@ -31,7 +32,7 @@ mod sequential;
 
 use itertools::Itertools;
 
-use numpy::{PyArray1, PyArray2};
+use numpy::{ndarray::Array1, PyArray1, PyArray2};
 use pyo3::{prelude::*, types::PyModule};
 use rand::seq::SliceRandom;
 
@@ -42,71 +43,137 @@ use crate::{
 
 const SEARCH_DEPTH: u32 = 2;
 
-fn get_diff(board: &BoardState) -> OrError<f32> {
-    let all_moves = board.get_all_possible_moves(Side::White);
-    let random_move = all_moves.choose(&mut rand::thread_rng());
-    let minimax_output = search_white(board, SEARCH_DEPTH)?;
-    let num_leaves = minimax_output.num_leaves;
-    println!("NUM LEAVES: {}", num_leaves); // TODO: remove
-    let minimax_move = minimax_output
+fn random_move(board: &BoardState, side: Side) -> BoardMove {
+    let all_moves = board.get_all_possible_moves(side);
+    all_moves.choose(&mut rand::thread_rng()).cloned().unwrap()
+}
+
+fn move_from_minimax_with_sequential(board: &BoardState, model: &SequentialModel) -> BoardMove {
+    // TODO: only supports Side::White!!
+    search_white(board, SEARCH_DEPTH, |board| {
+        let representation: BoardRepresentation = board.into();
+        let array = Array1::from_vec(representation.to_float_array().to_vec());
+        model.forward_one(array)
+    })
+    .unwrap()
+    .moves
+    .first()
+    .cloned()
+    .unwrap()
+}
+
+fn move_from_minimax_with_heuristic(board: &BoardState) -> BoardMove {
+    // TODO: only supports Side::White!!
+    search_white_with_heuristic(board, SEARCH_DEPTH)
+        .unwrap()
         .moves
         .first()
-        .unwrap_or(&BoardMove::None(Side::White));
-    let random_score = get_average_score(50000, board, random_move.unwrap());
-    let minimax_score = get_average_score(50000, board, minimax_move);
-    Ok(minimax_score - random_score)
+        .cloned()
+        .unwrap()
 }
 
-fn get_average_score(n: u32, board: &BoardState, white_move: &BoardMove) -> f32 {
-    let mut total = 0f32;
-    for _ in 0..n {
-        total += get_score(board, white_move);
-    }
-    total / (n as f32)
-}
-
-fn get_score(board: &BoardState, white_move: &BoardMove) -> f32 {
-    let mut board_mut = board.clone();
-    let black_moves = board_mut.get_all_possible_moves(Side::Black);
-    let random_black_move = black_moves.choose(&mut rand::thread_rng()).unwrap();
-    board_mut.step(white_move, random_black_move);
-    minimax::evaluate_material_heuristic(&board_mut)
-}
-
-fn run_analysis() {
-    let fen_strings = r#"2qn3B/P2k3p/5b1Q/8/8/Pb1r3P/1p5P/4K2R
-6n1/4P1B1/1Npkp1Pp/1Q1q4/8/2r2P2/4RK2/4n3
-r7/4B3/4P1p1/2P1q3/1p3n2/1bPn2PP/6N1/1k3K2
-8/1P6/5bK1/PP4Q1/3PN2B/1k4pN/4p1B1/1n2R3
-q6R/4n3/5K2/4PRB1/1p3Q2/1pP4p/2k1p1p1/7r
-5N2/1Pp3b1/8/3B2R1/1B1k2KQ/6p1/4p1P1/r4n1r
-1r6/bk6/5P2/2R1pPPp/1K5P/pp2n2b/1P6/8
-8/2k2K2/p1P4P/1PN2p1P/1p1B4/R3p3/4P3/2r3b1
-7B/3r4/1p4BP/1b5P/pk1r1p2/pn5P/2p5/6K1
-1K6/3Bn2k/pR1P4/b2pP3/7p/qP6/5r1B/6R1
-Q2b2N1/1qp5/2R3n1/4P2k/K3P3/2P5/1P1P3p/7N
-8/4R1p1/3P1Pb1/Npp5/3P4/5Bk1/1R1pK3/r3N3"#;
-    let board_states = fen_strings
-        .split('\n')
-        .map(|fen| BoardState::parse_fen(fen).unwrap())
-        .collect_vec();
-    let floats = board_states
+// take some random boards, play one as white, one as black, all the way to the end, count wins/draws/losses of each player as white/black
+fn get_versus_stats<F, G>(
+    boards: &Vec<BoardState>,
+    max_steps: usize,
+    mut player_a: F,
+    mut player_b: G,
+) -> (Counter<Outcome>, Counter<Outcome>)
+where
+    F: FnMut(&BoardState) -> BoardMove,
+    G: FnMut(&BoardState) -> BoardMove,
+{
+    let (outcomes_as_white, outcomes_as_black): (Vec<_>, Vec<_>) = boards
         .iter()
-        .map(|state| {
-            let representation: BoardRepresentation = state.into();
-            representation.to_float_array()
+        .map(|board| {
+            let a = play_to_end_state(
+                board.clone(),
+                max_steps,
+                |board| player_a(board),
+                |board| player_b(board),
+            );
+            let b = play_to_end_state(
+                board.clone(),
+                max_steps,
+                |board| player_b(board),
+                |board| player_a(board),
+            );
+            let outcome_a = match a {
+                EndState::Winner(side) => match side {
+                    Side::White => Outcome::Win,
+                    Side::Black => Outcome::Lose,
+                },
+                EndState::Draw => Outcome::Draw,
+            };
+            let outcome_b = match b {
+                EndState::Winner(side) => match side {
+                    Side::White => Outcome::Lose,
+                    Side::Black => Outcome::Win,
+                },
+                EndState::Draw => Outcome::Draw,
+            };
+            (outcome_a, outcome_b)
         })
-        .collect_vec();
-    println!("{:?}", floats);
+        .unzip();
+    // change to counters
+    (
+        outcomes_as_white.into_iter().collect::<Counter<_>>(),
+        outcomes_as_black.into_iter().collect::<Counter<_>>(),
+    )
+}
 
-    let scores: OrError<Vec<_>> = board_states.iter().map(get_diff).collect();
-    println!("scores={:?}", scores);
-    let scores = scores.unwrap();
-    let average = scores.iter().sum::<f32>() / scores.len() as f32;
-    println!("avg={:?}", average);
+#[derive(Hash, Eq, PartialEq)]
+enum Outcome {
+    Win,
+    Draw,
+    Lose,
+}
+
+impl Outcome {
+    fn score(self) -> f32 {
+        match self {
+            Outcome::Win => 1f32,
+            Outcome::Draw => 0.5f32,
+            Outcome::Lose => 0f32,
+        }
+    }
+}
+
+fn play_to_end_state<F, G>(
+    mut board: BoardState,
+    max_steps: usize,
+    mut white_player: F,
+    mut black_player: G,
+) -> EndState
+where
+    F: FnMut(&BoardState) -> BoardMove,
+    G: FnMut(&BoardState) -> BoardMove,
+{
+    let mut current_step = 0;
+    while current_step < max_steps {
+        if let Some(end_state) = minimax::get_board_end_state(&board) {
+            return end_state;
+        }
+        let white_move = white_player(&board);
+        let black_move = black_player(&board);
+        debug_assert!(white_move.side() == Side::White);
+        debug_assert!(black_move.side() == Side::Black);
+        board.step(&white_move, &black_move);
+        current_step += 1;
+    }
+    let material = minimax::evaluate_material_heuristic(&board);
+    match material.total_cmp(&0f32) {
+        Ordering::Less => EndState::Winner(Side::Black),
+        Ordering::Equal => EndState::Draw,
+        Ordering::Greater => EndState::Winner(Side::Black),
+    }
 }
 
 fn main() -> OrError<()> {
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|arg| arg == "test") {
+        println!("test");
+    }
     let code = include_str!("./model.py");
     let result: PyResult<_> = Python::with_gil(|py| {
         println!("Importing Python Code");
@@ -117,8 +184,11 @@ fn main() -> OrError<()> {
 
         println!("Attempting to learn");
 
-        let file = File::open("processed_random.fen").unwrap();
-        let reader = BufReader::new(file);
+        let training_file = File::open("processed_random.fen").expect("No training set found");
+        let reader = BufReader::new(training_file);
+        let mut losses_file = File::create("losses.txt").expect("Unable to open file for writing");
+        let mut weights_file =
+            File::create("weights.txt").expect("Unable to open file for writing");
         let mut losses = Vec::new();
         let chunk_size = 1000;
         let learn_batch_size = 10;
@@ -139,7 +209,7 @@ fn main() -> OrError<()> {
                 &boards,
                 |board| {
                     let before = Instant::now();
-                    let out = search_white(board, SEARCH_DEPTH).unwrap();
+                    let out = search_white_with_heuristic(board, SEARCH_DEPTH).unwrap();
                     let score = out.score;
                     let elapsed = before.elapsed();
                     // number of pieces and elapsed
@@ -203,15 +273,23 @@ fn main() -> OrError<()> {
                     losses.iter().rev().take(debug_every_x).sum::<f32>() / (debug_every_x as f32);
                 let sequential = model_instance.call_method0("model_layer_weights")?;
                 let extracted = SequentialModel::new_from_python(sequential).unwrap();
-                let weights = extracted.layers().first().unwrap().to_string();
+                let weights = extracted
+                    .layers()
+                    .iter()
+                    .map(|layer| layer.to_raw_string())
+                    .join("\n");
+
                 println!(
-                    "epoch={}, elapsed={:.2?}, per board={:.2?}, minimax per board={:.2?}",
+                    "epoch={}, loss={}, elapsed={:.2?}, per board={:.2?}, minimax per board={:.2?}",
                     i,
+                    avg,
                     elapsed,
                     elapsed.div_f32(chunk_size as f32),
                     minimax_time.div_f32(chunk_size as f32),
                 );
-                println!("{} => {}", avg, weights);
+                writeln!(losses_file, "{}", avg).expect("Unable to write to losses_file");
+                writeln!(weights_file, "epoch={}\n{}", i, weights)
+                    .expect("Unable to write to weights_file");
             }
         }
 
@@ -224,9 +302,5 @@ fn main() -> OrError<()> {
     let _sequential = result.map_err(|e| Error!("Unable to fetch model: {}", e))?;
     // let forwarded = sequential.forward(stacked_views);
     // println!("FORWARDED: {:?}", forwarded);
-    let args: Vec<String> = std::env::args().collect();
-    if args.iter().any(|arg| arg == "analyze") {
-        run_analysis();
-    }
     Ok(())
 }

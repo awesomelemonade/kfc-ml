@@ -5,15 +5,13 @@ from torch import nn, optim
 class Model:
     def __init__(self):
         self.model = nn.Sequential(
-            nn.Linear(34, 1),
-            # nn.ReLU(),
-            # nn.Linear(1024, 1024),
-            # nn.ReLU(),
-            # nn.Linear(1024, 256),
-            # nn.ReLU(),
-            # nn.Linear(256, 1)
+            nn.Linear(102, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1),
         )
-        self.optimizer = optim.Adam(self.model.parameters(), lr=0.001) # 0.01
+        self.optimizer = optim.Adam(self.model.parameters(), lr=0.01) # 0.01
 
     def learn_sequence(self, board_states):
         # learn from this sequence of board_states

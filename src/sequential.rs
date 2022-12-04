@@ -123,6 +123,24 @@ impl Display for Layer {
 }
 
 impl Layer {
+    pub fn to_raw_string(&self) -> String {
+        fn to_rounded_floats(vec: &[f32]) -> String {
+            let items = vec.iter().map(|x| format!("{}", x)).join(", ");
+            format!("[{}]", items)
+        }
+        match self {
+            Layer::ReLU => format!("ReLU"),
+            Layer::Linear { weights, biases } => {
+                let weights = weights.clone().into_raw_vec();
+                let biases = biases.clone().into_raw_vec();
+                format!(
+                    "Linear[weights={}, biases={}]",
+                    to_rounded_floats(&weights),
+                    to_rounded_floats(&biases)
+                )
+            }
+        }
+    }
     fn forward(&self, mut input: Batch) -> Batch {
         match self {
             Layer::ReLU => {
