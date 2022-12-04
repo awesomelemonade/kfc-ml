@@ -30,6 +30,11 @@ jobs:
           cache: 'pip'
       - name: Install Python Dependencies
         run: pip install -r ./${{ env.REPO }}/requirements.txt
+      - name: Download kfc-ml dataset
+        run: |
+          cd kfc-ml
+          chmod +x setup.sh
+          ./setup.sh
       - name: Update
         run: sudo apt-get update
       - uses: actions-rs/toolchain@v1
