@@ -88,10 +88,18 @@ impl Display for VersusStats {
         let b = Outcome::values().map(|x| (x, self.a_as_black[&x]));
         let c = Outcome::values().map(|x| (x, self.b_as_white[&x]));
         let d = Outcome::values().map(|x| (x, self.b_as_black[&x]));
-        writeln!(f, "Player A")?;
+        let a_score: f32 = (self.a_as_white.clone() | self.a_as_black.clone())
+            .into_iter()
+            .map(|(outcome, count)| outcome.score() * count as f32)
+            .sum();
+        let b_score: f32 = (self.b_as_white.clone() | self.b_as_black.clone())
+            .into_iter()
+            .map(|(outcome, count)| outcome.score() * count as f32)
+            .sum();
+        writeln!(f, "Player A: score={a_score}")?;
         writeln!(f, "\tAs White: {a:?}")?;
         writeln!(f, "\tAs Black: {b:?}")?;
-        writeln!(f, "Player B")?;
+        writeln!(f, "Player B: score={b_score}")?;
         writeln!(f, "\tAs White: {c:?}")?;
         writeln!(f, "\tAs Black: {d:?}")
     }
@@ -113,7 +121,7 @@ where
         Counter<_>,
         Counter<_>,
         Counter<_>,
-    ) = parallel_map_prioritized_by_pieces(&boards, |board| {
+    ) = parallel_map_prioritized_by_pieces(boards, |board| {
         let a = play_to_end_state(
             board.clone(),
             max_steps,
@@ -234,7 +242,9 @@ where
 fn main() -> OrError<()> {
     let args: Vec<String> = std::env::args().collect();
     let run_all_epochs = args.iter().any(|arg| arg == "--all");
+    let train = args.iter().any(|arg| arg == "--train");
     println!("Run all epochs? {run_all_epochs}");
+    println!("train? {train}");
     let code = include_str!("./model.py");
     let result: PyResult<_> = Python::with_gil(|py| {
         println!("Importing Python Code");
@@ -275,80 +285,81 @@ fn main() -> OrError<()> {
                 println!("Stats:\n{versus_stats}");
             }
             // TODO: need to bootstrap using heuristic first
-            // TODO: Parallelize, use move_heuristic and leaf_heuristic
-            let before_minimax_time = Instant::now();
-            let scores = parallel_map_prioritized_by_pieces(&boards, |board| {
-                let before = Instant::now();
-                let out = search_white_with_heuristic(board, SEARCH_DEPTH).unwrap();
-                let score = out.score;
-                let elapsed = before.elapsed();
-                // number of pieces and elapsed
-                if debug_stats {
-                    let best_piece = if let Some(best_move) = out.moves.first() {
-                        match best_move {
-                            BoardMove::None(_) => "None".to_owned(),
-                            BoardMove::LongCastle(_) => "LongCastle".to_owned(),
-                            BoardMove::ShortCastle(_) => "ShortCastle".to_owned(),
-                            BoardMove::Normal { piece, .. } => format!("{:?}", piece.kind),
-                        }
-                    } else {
-                        "N/A".to_owned()
-                    };
-                    println!(
-                        "{}, {}, {}, {}, {}, {}, {}",
-                        board.pieces().len(),
-                        out.num_leaves,
-                        out.num_regular_nodes,
-                        out.num_quiescent_nodes,
-                        elapsed.as_millis(),
-                        board.to_stationary_fen().unwrap(),
-                        best_piece,
-                    );
+            if train {
+                let before_minimax_time = Instant::now();
+                let scores = parallel_map_prioritized_by_pieces(&boards, |board| {
+                    let before = Instant::now();
+                    let out = search_white_with_heuristic(board, SEARCH_DEPTH).unwrap();
+                    let score = out.score;
+                    let elapsed = before.elapsed();
+                    // number of pieces and elapsed
+                    if debug_stats {
+                        let best_piece = if let Some(best_move) = out.moves.first() {
+                            match best_move {
+                                BoardMove::None(_) => "None".to_owned(),
+                                BoardMove::LongCastle(_) => "LongCastle".to_owned(),
+                                BoardMove::ShortCastle(_) => "ShortCastle".to_owned(),
+                                BoardMove::Normal { piece, .. } => format!("{:?}", piece.kind),
+                            }
+                        } else {
+                            "N/A".to_owned()
+                        };
+                        println!(
+                            "{}, {}, {}, {}, {}, {}, {}",
+                            board.pieces().len(),
+                            out.num_leaves,
+                            out.num_regular_nodes,
+                            out.num_quiescent_nodes,
+                            elapsed.as_millis(),
+                            board.to_stationary_fen().unwrap(),
+                            best_piece,
+                        );
+                    }
+                    score
+                });
+                let minimax_time = before_minimax_time.elapsed();
+
+                let mut total_loss = 0f32;
+                let mut num_losses = 0;
+                for chunks in &boards
+                    .into_iter()
+                    .zip_eq(scores.into_iter())
+                    .chunks(learn_batch_size)
+                {
+                    let (boards, scores): (Vec<_>, Vec<_>) = chunks.unzip();
+
+                    let representations = boards
+                        .iter()
+                        .map(|board| {
+                            let representation: BoardRepresentation = board.into();
+                            representation.to_float_array().to_vec()
+                        })
+                        .collect_vec();
+                    let representations = PyArray2::from_vec2(py, &representations).unwrap();
+                    let scores = PyArray1::from_vec(py, scores);
+
+                    let loss =
+                        model_instance.call_method1("learn_batch", (representations, scores));
+                    let loss = loss.unwrap_with_traceback(py).extract::<f32>().unwrap();
+                    total_loss += loss;
+                    num_losses += 1;
                 }
-                score
-            });
-            let minimax_time = before_minimax_time.elapsed();
 
-            let mut total_loss = 0f32;
-            let mut num_losses = 0;
-            for chunks in &boards
-                .into_iter()
-                .zip_eq(scores.into_iter())
-                .chunks(learn_batch_size)
-            {
-                let (boards, scores): (Vec<_>, Vec<_>) = chunks.unzip();
+                losses.push(total_loss / (num_losses as f32));
+                let elapsed = before.elapsed();
 
-                let representations = boards
-                    .iter()
-                    .map(|board| {
-                        let representation: BoardRepresentation = board.into();
-                        representation.to_float_array().to_vec()
-                    })
-                    .collect_vec();
-                let representations = PyArray2::from_vec2(py, &representations).unwrap();
-                let scores = PyArray1::from_vec(py, scores);
+                if i % debug_every_x == 0 {
+                    let avg: f32 = losses.iter().rev().take(debug_every_x).sum::<f32>()
+                        / (debug_every_x as f32);
+                    let sequential = model_instance.call_method0("model_layer_weights")?;
+                    let extracted = SequentialModel::new_from_python(sequential).unwrap();
+                    let weights = extracted
+                        .layers()
+                        .iter()
+                        .map(|layer| layer.to_raw_string())
+                        .join("\n");
 
-                let loss = model_instance.call_method1("learn_batch", (representations, scores));
-                let loss = loss.unwrap_with_traceback(py).extract::<f32>().unwrap();
-                total_loss += loss;
-                num_losses += 1;
-            }
-
-            losses.push(total_loss / (num_losses as f32));
-            let elapsed = before.elapsed();
-
-            if i % debug_every_x == 0 {
-                let avg: f32 =
-                    losses.iter().rev().take(debug_every_x).sum::<f32>() / (debug_every_x as f32);
-                let sequential = model_instance.call_method0("model_layer_weights")?;
-                let extracted = SequentialModel::new_from_python(sequential).unwrap();
-                let weights = extracted
-                    .layers()
-                    .iter()
-                    .map(|layer| layer.to_raw_string())
-                    .join("\n");
-
-                println!(
+                    println!(
                     "epoch={}, loss={}, elapsed={:.2?}, per board={:.2?}, minimax per board={:.2?}",
                     i,
                     avg,
@@ -356,9 +367,10 @@ fn main() -> OrError<()> {
                     elapsed.div_f32(chunk_size as f32),
                     minimax_time.div_f32(chunk_size as f32),
                 );
-                writeln!(losses_file, "{avg}").expect("Unable to write to losses_file");
-                writeln!(weights_file, "epoch={i}\n{weights}")
-                    .expect("Unable to write to weights_file");
+                    writeln!(losses_file, "{avg}").expect("Unable to write to losses_file");
+                    writeln!(weights_file, "epoch={i}\n{weights}")
+                        .expect("Unable to write to weights_file");
+                }
             }
             if !run_all_epochs {
                 break;

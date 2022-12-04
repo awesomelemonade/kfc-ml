@@ -46,7 +46,7 @@ impl<T> UnwrapWithTraceback<T> for PyResult<T> {
                 if let Some(traceback) = error.traceback(py) {
                     println!("Traceback:\n{}", traceback.format().unwrap());
                 }
-                panic!("Unwrap error: {}\n", error);
+                panic!("Unwrap error: {error}\n");
             }
         }
     }
