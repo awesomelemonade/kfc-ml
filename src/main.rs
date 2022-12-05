@@ -269,6 +269,7 @@ fn main() -> OrError<()> {
     let args: Vec<String> = std::env::args().collect();
     let run_all_epochs = args.iter().any(|arg| arg == "--all");
     let train = args.iter().any(|arg| arg == "--train");
+    let no_versus = args.iter().any(|arg| arg == "--no-versus");
     println!("Run all epochs? {run_all_epochs}");
     println!("train? {train}");
     let code = include_str!("./model.py");
@@ -280,8 +281,7 @@ fn main() -> OrError<()> {
         let model_instance = model.call0()?;
         let mut current_sequential = {
             let sequential = model_instance.call_method0("model_layer_weights")?;
-            let extracted = SequentialModel::new_from_python(sequential).unwrap();
-            extracted
+            SequentialModel::new_from_python(sequential).unwrap()
         };
         println!("Attempting to learn");
 
@@ -302,7 +302,7 @@ fn main() -> OrError<()> {
         let debug_every_x = 1;
         let debug_stats = false;
         let num_versus_games = if run_all_epochs { 20 } else { 1 };
-        let versus_stats = true;
+        let versus_stats = !no_versus;
         let versus_stats_max_steps = if run_all_epochs { 1000 } else { 5 };
         for (i, lines) in reader.lines().chunks(chunk_size).into_iter().enumerate() {
             let before = Instant::now();
@@ -388,8 +388,7 @@ fn main() -> OrError<()> {
                 losses.push(total_loss / (num_losses as f32));
                 current_sequential = {
                     let sequential = model_instance.call_method0("model_layer_weights")?;
-                    let extracted = SequentialModel::new_from_python(sequential).unwrap();
-                    extracted
+                    SequentialModel::new_from_python(sequential).unwrap()
                 };
                 let elapsed = before.elapsed();
 
@@ -413,6 +412,7 @@ fn main() -> OrError<()> {
                             .as_millis();
                         format!("weights_epoch-{i}_{time}.tar")
                     };
+                    println!("Saving state to {weights_filename}");
                     model_instance.call_method1("save_state", (weights_filename,))?;
                 }
             }

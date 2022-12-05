@@ -60,6 +60,7 @@ jobs:
           name: perf.data
           path: ./perf.data
           retention-days: 30
+      - run: rm ./perf.data
       - run: flamegraph -c "record -F 997 --call-graph dwarf,65528 -g" -o my_flamegraph.svg -- ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
       - name: Archive flamegraph
         uses: actions/upload-artifact@v2
