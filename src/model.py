@@ -57,3 +57,9 @@ class Model:
                 return ("Unknown", None)
         return [layer_info(module) for module in self.model.modules() if not isinstance(module, nn.Sequential)]
 
+    def save_state(self, path):
+        torch.save(self.model.state_dict(), path)
+
+    def load_state(self, path):
+        self.model.load_state_dict(torch.load(path))
+

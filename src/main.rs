@@ -16,7 +16,13 @@ mod imports;
 
 mod game;
 use std::{
-    cmp::Ordering, fmt::Display, fs::File, io::BufRead, io::BufReader, io::Write, time::Instant,
+    cmp::Ordering,
+    fmt::Display,
+    fs::File,
+    io::BufRead,
+    io::BufReader,
+    io::Write,
+    time::{Duration, Instant, SystemTime},
 };
 
 use counter::Counter;
@@ -50,20 +56,23 @@ fn random_move(board: &BoardState, side: Side) -> BoardMove {
     all_moves.choose(&mut rand::thread_rng()).cloned().unwrap()
 }
 
+fn evaluate_board_with_sequential(board: &BoardState, model: &SequentialModel) -> f32 {
+    if let Some(end_state) = minimax::get_board_end_state(board) {
+        return end_state.to_heuristic_score(100f32);
+    }
+    let mut board = board.clone();
+    board.step_until_stationary_with_no_cooldown();
+    let representation: BoardRepresentation = board.into();
+    let array = Array1::from_vec(representation.to_float_array().to_vec());
+    model.forward_one(array)
+}
 fn move_from_minimax_with_sequential(
     board: &BoardState,
     side: Side,
     model: &SequentialModel,
 ) -> BoardMove {
     search_white(board, SEARCH_DEPTH, |board| {
-        if let Some(end_state) = minimax::get_board_end_state(board) {
-            return end_state.to_heuristic_score(100f32);
-        }
-        let mut board = board.clone();
-        board.step_until_stationary_with_no_cooldown();
-        let representation: BoardRepresentation = board.into();
-        let array = Array1::from_vec(representation.to_float_array().to_vec());
-        model.forward_one(array)
+        evaluate_board_with_sequential(board, model)
     })
     .unwrap()
     .get_first_move_of_side(side)
@@ -122,12 +131,14 @@ where
         Counter<_>,
         Counter<_>,
     ) = parallel_map_prioritized_by_pieces(boards, |board| {
+        println!("Playing as white... {}", board.to_stationary_fen().unwrap());
         let a = play_to_end_state(
             board.clone(),
             max_steps,
             |board| player_a(board, Side::White),
             |board| player_b(board, Side::Black),
         );
+        println!("Playing as black... {}", board.to_stationary_fen().unwrap());
         let b = play_to_end_state(
             board.clone(),
             max_steps,
@@ -205,17 +216,32 @@ where
     G: FnMut(&BoardState) -> BoardMove,
 {
     let mut current_step = 0;
+    let mut white_time = Duration::from_secs(0);
+    let mut black_time = Duration::from_secs(0);
+    let mut step_time = Duration::from_secs(0);
     while current_step < max_steps {
         if let Some(end_state) = minimax::get_board_end_state(&board) {
+            println!(
+                "TOTAL TIME: white={white_time:.2?}, black={black_time:.2?}, step={step_time:.2?}, num steps={current_step}"
+            );
             return end_state;
         }
+        let a = Instant::now();
         let white_move = white_player(&board);
+        white_time += a.elapsed();
+        let b = Instant::now();
         let black_move = black_player(&board);
+        black_time += b.elapsed();
         debug_assert!(white_move.side() == Side::White);
         debug_assert!(black_move.side() == Side::Black);
+        let c = Instant::now();
         board.step(&white_move, &black_move);
+        step_time += c.elapsed();
         current_step += 1;
     }
+    println!(
+        "TOTAL TIME: white={white_time:.2?}, black={black_time:.2?}, step={step_time:.2?}, num steps={current_step}"
+    );
     let material = minimax::evaluate_material_heuristic(&board);
     match material.total_cmp(&0f32) {
         Ordering::Less => EndState::Winner(Side::Black),
@@ -252,44 +278,58 @@ fn main() -> OrError<()> {
         println!("Creating Model");
         let model = module.getattr("Model")?;
         let model_instance = model.call0()?;
-
+        let mut current_sequential = {
+            let sequential = model_instance.call_method0("model_layer_weights")?;
+            let extracted = SequentialModel::new_from_python(sequential).unwrap();
+            extracted
+        };
         println!("Attempting to learn");
 
         let training_file = File::open("processed_random.fen").expect("No training set found");
         let reader = BufReader::new(training_file);
-        let mut losses_file = File::create("losses.txt").expect("Unable to open file for writing");
-        let mut weights_file =
-            File::create("weights.txt").expect("Unable to open file for writing");
+        let losses_filename = {
+            let time = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_millis();
+            format!("losses-{time}.txt")
+        };
+        let mut losses_file =
+            File::create(losses_filename).expect("Unable to open file for writing");
         let mut losses = Vec::new();
         let chunk_size = 1000;
         let learn_batch_size = 10;
         let debug_every_x = 1;
         let debug_stats = false;
-        let num_versus_games = if run_all_epochs { 10 } else { 1 };
+        let num_versus_games = if run_all_epochs { 20 } else { 1 };
         let versus_stats = true;
+        let versus_stats_max_steps = if run_all_epochs { 1000 } else { 5 };
         for (i, lines) in reader.lines().chunks(chunk_size).into_iter().enumerate() {
             let before = Instant::now();
             let boards = lines
                 .map(|line| BoardState::parse_fen(line.unwrap().as_str()).unwrap())
                 .collect_vec();
             if versus_stats {
-                let sequential = model_instance.call_method0("model_layer_weights")?;
-                let extracted = SequentialModel::new_from_python(sequential).unwrap();
-
+                println!("Computing versus stats");
                 let versus_stats = get_versus_stats(
                     &boards[..num_versus_games],
-                    1000,
-                    |board, side| move_from_minimax_with_sequential(board, side, &extracted),
+                    versus_stats_max_steps,
+                    |board, side| {
+                        move_from_minimax_with_sequential(board, side, &current_sequential)
+                    },
                     move_from_minimax_with_heuristic,
                 );
-                println!("Stats:\n{versus_stats}");
+                println!("{versus_stats}");
             }
             // TODO: need to bootstrap using heuristic first
             if train {
                 let before_minimax_time = Instant::now();
                 let scores = parallel_map_prioritized_by_pieces(&boards, |board| {
                     let before = Instant::now();
-                    let out = search_white_with_heuristic(board, SEARCH_DEPTH).unwrap();
+                    let out = search_white(board, SEARCH_DEPTH, |board| {
+                        evaluate_board_with_sequential(board, &current_sequential)
+                    })
+                    .unwrap();
                     let score = out.score;
                     let elapsed = before.elapsed();
                     // number of pieces and elapsed
@@ -346,30 +386,34 @@ fn main() -> OrError<()> {
                 }
 
                 losses.push(total_loss / (num_losses as f32));
+                current_sequential = {
+                    let sequential = model_instance.call_method0("model_layer_weights")?;
+                    let extracted = SequentialModel::new_from_python(sequential).unwrap();
+                    extracted
+                };
                 let elapsed = before.elapsed();
 
                 if i % debug_every_x == 0 {
                     let avg: f32 = losses.iter().rev().take(debug_every_x).sum::<f32>()
                         / (debug_every_x as f32);
-                    let sequential = model_instance.call_method0("model_layer_weights")?;
-                    let extracted = SequentialModel::new_from_python(sequential).unwrap();
-                    let weights = extracted
-                        .layers()
-                        .iter()
-                        .map(|layer| layer.to_raw_string())
-                        .join("\n");
-
                     println!(
-                    "epoch={}, loss={}, elapsed={:.2?}, per board={:.2?}, minimax per board={:.2?}",
-                    i,
-                    avg,
-                    elapsed,
-                    elapsed.div_f32(chunk_size as f32),
-                    minimax_time.div_f32(chunk_size as f32),
-                );
+                        "epoch={}, loss={}, elapsed={:.2?}, per board={:.2?}, minimax per board={:.2?}",
+                        i,
+                        avg,
+                        elapsed,
+                        elapsed.div_f32(chunk_size as f32),
+                        minimax_time.div_f32(chunk_size as f32),
+                    );
                     writeln!(losses_file, "{avg}").expect("Unable to write to losses_file");
-                    writeln!(weights_file, "epoch={i}\n{weights}")
-                        .expect("Unable to write to weights_file");
+                    // save weights
+                    let weights_filename = {
+                        let time = SystemTime::now()
+                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .expect("Time went backwards")
+                            .as_millis();
+                        format!("weights_epoch-{i}_{time}.tar")
+                    };
+                    model_instance.call_method1("save_state", (weights_filename,))?;
                 }
             }
             if !run_all_epochs {
