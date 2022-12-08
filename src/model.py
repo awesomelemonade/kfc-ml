@@ -5,11 +5,7 @@ from torch import nn, optim
 class Model:
     def __init__(self):
         self.model = nn.Sequential(
-            nn.Linear(102, 256),
-            nn.ReLU(),
-            nn.Linear(256, 256),
-            nn.ReLU(),
-            nn.Linear(256, 1),
+            nn.Linear(34, 1),
         )
         self.optimizer = optim.Adam(self.model.parameters(), lr=0.01) # 0.01
 

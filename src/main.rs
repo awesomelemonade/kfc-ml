@@ -272,6 +272,7 @@ fn main() -> OrError<()> {
     let no_versus = args.iter().any(|arg| arg == "--no-versus");
     println!("Run all epochs? {run_all_epochs}");
     println!("train? {train}");
+    println!("no versus? {no_versus}");
     let code = include_str!("./model.py");
     let result: PyResult<_> = Python::with_gil(|py| {
         println!("Importing Python Code");

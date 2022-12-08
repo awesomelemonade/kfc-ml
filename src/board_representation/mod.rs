@@ -205,13 +205,9 @@ impl BoardRepresentationPiece {
         match self {
             BoardRepresentationPiece::Missing => {
                 array[0] = 0f32;
-                array[1] = 0f32;
-                array[2] = 0f32;
             }
-            BoardRepresentationPiece::Stationary { x, y, .. } => {
+            BoardRepresentationPiece::Stationary { .. } => {
                 array[0] = 1f32;
-                array[1] = *x;
-                array[2] = *y;
             }
             BoardRepresentationPiece::Moving { .. } => {
                 panic!();
@@ -219,9 +215,32 @@ impl BoardRepresentationPiece {
         }
     }
     const fn num_floats() -> usize {
-        3
+        1
     }
 }
+
+// impl BoardRepresentationPiece {
+//     fn write_floats(&self, array: &mut [f32]) {
+//         match self {
+//             BoardRepresentationPiece::Missing => {
+//                 array[0] = 0f32;
+//                 array[1] = 0f32;
+//                 array[2] = 0f32;
+//             }
+//             BoardRepresentationPiece::Stationary { x, y, .. } => {
+//                 array[0] = 1f32;
+//                 array[1] = *x;
+//                 array[2] = *y;
+//             }
+//             BoardRepresentationPiece::Moving { .. } => {
+//                 panic!();
+//             }
+//         }
+//     }
+//     const fn num_floats() -> usize {
+//         3
+//     }
+// }
 
 // impl BoardRepresentationPiece {
 //     fn write_floats(&self, array: &mut [f32]) {
