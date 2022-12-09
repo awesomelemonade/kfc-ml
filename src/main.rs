@@ -311,8 +311,17 @@ fn main() -> OrError<()> {
                 .map(|line| BoardState::parse_fen(line.unwrap().as_str()).unwrap())
                 .collect_vec();
             if versus_stats {
-                println!("Computing versus stats");
-                let versus_stats = get_versus_stats(
+                println!("Computing versus stats versus heuristic");
+                let versus_stats_random = get_versus_stats(
+                    &boards[..num_versus_games],
+                    versus_stats_max_steps,
+                    |board, side| {
+                        move_from_minimax_with_sequential(board, side, &current_sequential)
+                    },
+                    random_move,
+                );
+                println!("{versus_stats_random}");
+                let versus_stats_heuristic = get_versus_stats(
                     &boards[..num_versus_games],
                     versus_stats_max_steps,
                     |board, side| {
@@ -320,7 +329,7 @@ fn main() -> OrError<()> {
                     },
                     move_from_minimax_with_heuristic,
                 );
-                println!("{versus_stats}");
+                println!("{versus_stats_heuristic}");
             }
             // TODO: need to bootstrap using heuristic first
             if train {

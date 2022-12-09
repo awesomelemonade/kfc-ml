@@ -174,6 +174,7 @@ impl Default for BoardRepresentationSide {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 enum BoardRepresentationPiece {
     Stationary { x: f32, y: f32, cooldown: f32 },
