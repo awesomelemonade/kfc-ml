@@ -118,6 +118,16 @@ impl Display for Layer {
 }
 
 impl Layer {
+    #[cfg(test)]
+    pub fn to_raw_string(&self) -> String {
+        match self {
+            Layer::ReLU => "ReLU".to_string(),
+            Layer::Linear { weights, biases } => {
+                format!("Linear[weights={weights:#?}, biases={biases:#?}]")
+            }
+        }
+    }
+
     fn forward(&self, mut input: Batch) -> Batch {
         match self {
             Layer::ReLU => {
