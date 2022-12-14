@@ -24,10 +24,6 @@ pub struct SequentialModel {
 }
 
 impl SequentialModel {
-    pub fn layers(&self) -> &Vec<Layer> {
-        &self.layers
-    }
-
     pub fn forward_one(&self, input: Array1<f32>) -> f32 {
         self.forward(input.insert_axis(Axis(1)))[0]
     }
@@ -91,10 +87,6 @@ impl SequentialModel {
 
         Ok(Self { layers })
     }
-
-    pub fn new_direct(layers: Vec<Layer>) -> Self {
-        Self { layers }
-    }
 }
 
 #[derive(Debug)]
@@ -126,14 +118,6 @@ impl Display for Layer {
 }
 
 impl Layer {
-    pub fn to_raw_string(&self) -> String {
-        match self {
-            Layer::ReLU => "ReLU".to_string(),
-            Layer::Linear { weights, biases } => {
-                format!("Linear[weights={weights:#?}, biases={biases:#?}]")
-            }
-        }
-    }
     fn forward(&self, mut input: Batch) -> Batch {
         match self {
             Layer::ReLU => {
