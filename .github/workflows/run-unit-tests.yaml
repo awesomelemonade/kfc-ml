@@ -30,6 +30,10 @@ jobs:
           cache: 'pip'
       - name: Install Python Dependencies
         run: pip install -r ./${{ env.REPO }}/requirements.txt
+      - name: Download kfc-ml dataset
+        run: |
+          chmod +x ./kfc-ml/setup.sh
+          ./kfc-ml/setup.sh
       - name: Update
         run: sudo apt-get update
       - uses: actions-rs/toolchain@v1
@@ -49,14 +53,14 @@ jobs:
       - run: sudo sh -c " echo 0 > /proc/sys/kernel/kptr_restrict"
       - name: Perf version
         run: perf --version
-      - run: perf record --call-graph dwarf -o perf.data ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
+      - run: perf record -g --call-graph dwarf -o perf.data ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
       - name: Archive perf
         uses: actions/upload-artifact@v2
         with:
           name: perf.data
           path: ./perf.data
           retention-days: 30
-      - run: flamegraph -o my_flamegraph.svg -- ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
+      - run: flamegraph -c "record -F 997 --call-graph dwarf,65528 -g" -o my_flamegraph.svg -- ./${{ env.REPO }}/target/release-with-debug/${{ env.REPO }}
       - name: Archive flamegraph
         uses: actions/upload-artifact@v2
         with:

@@ -5,6 +5,7 @@ use core::slice;
 use super::*;
 use enum_map::EnumMap;
 use itertools::Itertools;
+use rand::{seq::SliceRandom, Rng};
 
 #[derive(Debug, Clone)]
 pub struct BoardState {
@@ -12,9 +13,6 @@ pub struct BoardState {
     can_long_castle: EnumMap<Side, bool>,
     can_short_castle: EnumMap<Side, bool>,
 }
-
-pub static mut Q_COUNT: u32 = 0;
-pub static mut S_COUNT: u32 = 0;
 
 // has to be less than sqrt(2)/2 to ensure bishops do not capture squares
 //                                          it is not supposed to capture
@@ -351,9 +349,8 @@ impl BoardState {
         self.step(&BoardMove::None(Side::White), &BoardMove::None(Side::Black));
     }
     pub fn step(&mut self, white_move: &BoardMove, black_move: &BoardMove) {
-        unsafe {
-            S_COUNT += 1;
-        }
+        debug_assert!(white_move.side() == Side::White);
+        debug_assert!(black_move.side() == Side::Black);
         self.apply_move(white_move);
         self.apply_move(black_move);
         fn position_after_step(piece_state: &PieceState) -> (f32, f32) {
@@ -590,11 +587,6 @@ impl BoardState {
     where
         F: Fn(PieceKind) -> i32,
     {
-        unsafe {
-            Q_COUNT += 1;
-        }
-        // TODO: search promotion moves?
-
         // prioritize captures by computing value of victim - attacker
         // then prioritize getting out of the way - maybe by distance? shorter distance is better?
         // then search None?
@@ -838,10 +830,40 @@ impl BoardState {
         }
         Ok(Self::new_with_castling(pieces, false))
     }
+    pub fn to_stationary_fen(&self) -> OrError<String> {
+        if self.is_all_pieces_stationary() {
+            let mut fen = Vec::new();
+            for row in 0..BOARD_SIZE {
+                let mut s = String::new();
+                let mut empty = 0u32;
+                for column in 0..BOARD_SIZE {
+                    if let Some(piece) = self.get_stationary_piece((column, row).into()) {
+                        if empty > 0 {
+                            s.push_str(empty.to_string().as_str());
+                            empty = 0;
+                        }
+                        let c: char = piece.kind.into();
+                        if piece.side == Side::White {
+                            s.push(c.to_ascii_uppercase());
+                        } else {
+                            s.push(c.to_ascii_lowercase());
+                        }
+                    } else {
+                        empty += 1;
+                    }
+                }
+                if empty > 0 {
+                    s.push_str(empty.to_string().as_str());
+                }
+                fen.push(s);
+            }
+            Ok(fen.join("/"))
+        } else {
+            Err(Error!("Pieces are not all stationary"))
+        }
+    }
     pub fn is_all_pieces_stationary(&self) -> bool {
-        self.pieces
-            .iter()
-            .all(|piece| matches!(piece.state, PieceState::Stationary { .. }))
+        self.pieces.iter().all(|piece| piece.state.is_stationary())
     }
     pub fn is_all_pieces_stationary_with_no_cooldown(&self) -> bool {
         self.pieces.iter().all(
@@ -878,6 +900,75 @@ impl BoardState {
             }
         })
     }
+    pub fn generate_random_board_with(num_pieces_per_side: usize) -> Self {
+        let distribution = "PPPPPPPPNNBBRRQ"
+            .chars()
+            .map(|c| PieceKind::from_char(c).unwrap())
+            .collect_vec();
+        debug_assert!(num_pieces_per_side >= 1); // requires king
+        debug_assert!(num_pieces_per_side <= distribution.len());
+
+        let white_pieces = distribution
+            .choose_multiple(&mut rand::thread_rng(), num_pieces_per_side - 1)
+            .chain(std::iter::once(&PieceKind::King))
+            .map(|kind| (Side::White, *kind));
+        let black_pieces = distribution
+            .choose_multiple(&mut rand::thread_rng(), num_pieces_per_side - 1)
+            .chain(std::iter::once(&PieceKind::King))
+            .map(|kind| (Side::Black, *kind));
+        let pieces = white_pieces.chain(black_pieces).collect_vec();
+        Self::generate_random_board(pieces)
+    }
+    // TODO-someday: maybe put some rules that will generate reasonable boards
+    pub fn generate_random_board(pieces: impl IntoIterator<Item = (Side, PieceKind)>) -> Self {
+        fn random_position() -> Position {
+            let x = rand::thread_rng().gen_range(0..BOARD_SIZE) as u32;
+            let y = rand::thread_rng().gen_range(0..BOARD_SIZE) as u32;
+            Position { x, y }
+        }
+        fn random_with_reqs<F>(f: F) -> Position
+        where
+            F: Fn(&Position) -> bool,
+        {
+            loop {
+                let position = random_position();
+                if f(&position) {
+                    return position;
+                }
+            }
+        }
+        let mut pieces_vec = Vec::new();
+        let mut occupied = [[false; BOARD_SIZE]; BOARD_SIZE];
+
+        fn add_piece(
+            pieces: &mut Vec<Piece>,
+            occupied: &mut [[bool; BOARD_SIZE]; BOARD_SIZE],
+            side: Side,
+            kind: PieceKind,
+        ) {
+            let position = match kind {
+                PieceKind::Pawn => random_with_reqs(|pos| {
+                    pos.y != 0
+                        && pos.y != BOARD_SIZE as u32 - 1
+                        && !occupied[pos.x as usize][pos.y as usize]
+                }),
+                _ => random_with_reqs(|pos| !occupied[pos.x as usize][pos.y as usize]),
+            };
+            occupied[position.x as usize][position.y as usize] = true;
+            pieces.push(Piece {
+                side,
+                kind,
+                state: PieceState::Stationary {
+                    position,
+                    cooldown: 0,
+                },
+            });
+        }
+        for (side, kind) in pieces {
+            add_piece(&mut pieces_vec, &mut occupied, side, kind);
+        }
+        Self::new_with_castling(pieces_vec, false)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -886,6 +977,17 @@ pub enum BoardMove {
     LongCastle(Side),
     ShortCastle(Side),
     Normal { piece: Piece, target: Position }, // TODO-someday: PieceState should always be stationary here - represent this differently?
+}
+
+impl BoardMove {
+    pub fn side(&self) -> Side {
+        match self {
+            BoardMove::None(side) => *side,
+            BoardMove::LongCastle(side) => *side,
+            BoardMove::ShortCastle(side) => *side,
+            BoardMove::Normal { piece, .. } => piece.side,
+        }
+    }
 }
 
 struct MoveGenerator<'a> {
